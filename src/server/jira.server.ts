@@ -381,6 +381,18 @@ export async function deleteIssue(issueKey: string): Promise<void> {
   await jiraFetch('DELETE', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`)
 }
 
+export async function updateIssueDescription(issueKey: string, description: string): Promise<void> {
+  await jiraFetch('PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    fields: { description: adfDoc(description) },
+  })
+}
+
+export async function addComment(issueKey: string, body: string): Promise<void> {
+  await jiraFetch('POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
+    body: adfDoc(body),
+  })
+}
+
 export async function search(jql: string): Promise<Issue[]> {
   const r = await jiraFetch<{ issues: RawIssue[] }>('POST', '/rest/api/3/search/jql', {
     jql,
@@ -427,8 +439,18 @@ function adfToText(node: unknown): string | undefined {
   const blockTypes = new Set(['paragraph', 'heading', 'listItem', 'blockquote', 'codeBlock'])
   const walk = (n: any): string => {
     if (!n || typeof n !== 'object') return ''
-    if (n.type === 'text') return typeof n.text === 'string' ? n.text : ''
+    if (n.type === 'text') {
+      const text = typeof n.text === 'string' ? n.text : ''
+      // Preserve link targets so the frontend can linkify them. When the visible
+      // text isn't itself the URL, keep both: "label (https://…)".
+      const href = Array.isArray(n.marks)
+        ? n.marks.find((m: any) => m?.type === 'link')?.attrs?.href
+        : undefined
+      return href && href !== text ? `${text} (${href})` : text
+    }
     if (n.type === 'hardBreak') return '\n'
+    // Smart links / URL cards carry the URL in attrs, not as child text.
+    if (n.type === 'inlineCard' || n.type === 'blockCard') return n.attrs?.url ?? ''
     const children: any[] = Array.isArray(n.content) ? n.content : []
     const inner = children.map(walk).join('')
     return blockTypes.has(n.type) ? inner + '\n' : inner
@@ -440,9 +462,10 @@ function adfToText(node: unknown): string | undefined {
 // adfDoc wraps plain text in a minimal Atlassian Document Format document, which
 // the v3 create-issue endpoint requires for rich-text fields like description.
 function adfDoc(text: string) {
-  return {
-    type: 'doc',
-    version: 1,
-    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
-  }
+  // Split on newlines into paragraphs; empty text yields a single empty
+  // paragraph (valid ADF — an empty text node is not).
+  const content = text.split('\n').map((line) =>
+    line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' },
+  )
+  return { type: 'doc', version: 1, content }
 }

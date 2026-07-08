@@ -32,6 +32,14 @@ export const deleteIssue = createServerFn({ method: 'POST' })
   .validator((d: { issueKey: string }) => d)
   .handler(({ data }) => jira.deleteIssue(data.issueKey))
 
+export const updateIssueDescription = createServerFn({ method: 'POST' })
+  .validator((d: { issueKey: string; description: string }) => d)
+  .handler(({ data }) => jira.updateIssueDescription(data.issueKey, data.description))
+
+export const addIssueComment = createServerFn({ method: 'POST' })
+  .validator((d: { issueKey: string; body: string }) => d)
+  .handler(({ data }) => jira.addComment(data.issueKey, data.body))
+
 export const moveIssue = createServerFn({ method: 'POST' })
   .validator((d: { issueKey: string; boardId: string; targetColumnName: string }) => d)
   .handler(({ data }) => jira.moveIssue(data.issueKey, data.boardId, data.targetColumnName))

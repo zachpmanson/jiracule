@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CreateIssueInput, Issue } from './types'
 import {
+  addIssueComment,
   createIssue,
   deleteIssue,
   getBoardColumns,
@@ -10,6 +11,7 @@ import {
   getMe,
   moveIssue,
   searchIssues,
+  updateIssueDescription,
 } from './server/jira.functions'
 
 export const keys = {
@@ -26,6 +28,23 @@ export function useIssueDetail(issueKey: string | null) {
     queryKey: keys.issue(issueKey ?? ''),
     queryFn: () => getIssueDetail({ data: { issueKey: issueKey! } }),
     enabled: !!issueKey,
+  })
+}
+
+export function useUpdateDescription(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (description: string) =>
+      updateIssueDescription({ data: { issueKey, description } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(issueKey) }),
+  })
+}
+
+export function useAddComment(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: string) => addIssueComment({ data: { issueKey, body } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(issueKey) }),
   })
 }
 

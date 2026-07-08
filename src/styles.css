@@ -417,11 +417,42 @@ button.primary {
   padding: 1px 6px;
   font-size: 12px;
 }
-.detail-desc-label {
+.section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 4px;
+}
+.editor {
+  margin-bottom: 14px;
+}
+.editor textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+}
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.comment-composer {
+  margin-top: 4px;
+}
+.inline-link {
+  color: var(--accent);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+button.link-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 .detail-desc {
   white-space: pre-wrap;
