@@ -44,7 +44,9 @@ async function jiraFetch<T>(
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
-    throw new JiraError(await parseError(res), res.status)
+    const message = await parseError(res)
+    console.error(`[jira] ${method} ${path} -> ${res.status}: ${message}`)
+    throw new JiraError(message, res.status)
   }
   if (res.status === 204) return undefined
   return (await res.json()) as T
@@ -131,8 +133,19 @@ function parseBoardKey(key: string): { kind: BoardKind; id: string } {
 }
 
 export async function listBoards(auth: JiraAuth): Promise<Board[]> {
-  const [agile, projects] = await Promise.all([listAgileBoards(auth), listProjectBoards(auth)])
-  return [...agile, ...projects]
+  // Run both board sources independently: a failure of one (e.g. missing a
+  // Software scope) shouldn't hide the other. Only fail if both fail.
+  const [agile, projects] = await Promise.allSettled([
+    listAgileBoards(auth),
+    listProjectBoards(auth),
+  ])
+  const out: Board[] = []
+  if (agile.status === 'fulfilled') out.push(...agile.value)
+  else console.error('[jira] listAgileBoards failed:', (agile.reason as Error)?.message)
+  if (projects.status === 'fulfilled') out.push(...projects.value)
+  else console.error('[jira] listProjectBoards failed:', (projects.reason as Error)?.message)
+  if (agile.status === 'rejected' && projects.status === 'rejected') throw agile.reason
+  return out
 }
 
 async function listAgileBoards(auth: JiraAuth): Promise<Board[]> {

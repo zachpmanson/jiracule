@@ -43,7 +43,22 @@ function sessionPassword() {
   return 'jiracule-dev-insecure-session-password-change-me'
 }
 
-export const SCOPES = 'read:jira-work write:jira-work read:jira-user offline_access'
+// Classic scopes cover all the platform (api/3) endpoints; the Agile board API
+// additionally needs a few granular Jira Software scopes. Atlassian allows an app
+// to carry both and request a mix ("use classic to the max extent; granular only
+// where required").
+export const SCOPES = [
+  // platform (classic)
+  'read:jira-work',
+  'write:jira-work',
+  'read:jira-user',
+  // jira software — agile boards (granular)
+  'read:board-scope:jira-software',
+  'read:board-scope.admin:jira-software',
+  'read:issue-details:jira',
+  // refresh tokens
+  'offline_access',
+].join(' ')
 
 export function getMainSession() {
   return useSession<SessionData>({ password: sessionPassword(), name: 'jiracule_session' })
