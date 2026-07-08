@@ -50,6 +50,14 @@ export interface Issue {
   assignee?: Assignee
 }
 
+// One page of a lane's issues, plus the cursor for the next page and the lane's
+// (approximate) server-side total. `total` is only present on the first page.
+export interface LanePage {
+  issues: Issue[]
+  nextCursor: string | null
+  total: number | null
+}
+
 // A run of inline text; `href` set means it should render as a link.
 export interface InlineSegment {
   text: string

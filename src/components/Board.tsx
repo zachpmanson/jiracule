@@ -74,7 +74,9 @@ export function Board({
       >
         <div className="board">
           {columns.map((c, i) => (
-            <Column key={c.name} column={c} issues={byColumn[i]} onDelete={onDelete} onOpen={onOpen} />
+            // Key by position, not name: a board can legitimately have two
+            // columns with the same name (e.g. two "Backlog" columns).
+            <Column key={i} column={c} issues={byColumn[i]} onDelete={onDelete} onOpen={onOpen} />
           ))}
         </div>
         {/* No drop animation: the card shouldn't fly back to its origin — the

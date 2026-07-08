@@ -43,12 +43,21 @@ function sessionPassword() {
   return 'jiracule-dev-insecure-session-password-change-me'
 }
 
-// Classic scopes cover every endpoint we use. All projects are surfaced as
-// status-column boards via the platform API; we don't call the Agile board API,
-// so no granular jira-software scopes are needed.
-export const SCOPES = ['read:jira-work', 'write:jira-work', 'read:jira-user', 'offline_access'].join(
-  ' ',
-)
+// Classic scopes cover the platform endpoints (projects, issues, statuses,
+// transitions, comments, users). The one granular jira-software scope is for the
+// Agile board API (/rest/agile/1.0/board*): its endpoints reject the classic
+// read:jira-work token with "scope does not match", so board column config needs
+// an explicit board scope. Every granular scope listed here must also be enabled
+// on the OAuth app in the Atlassian developer console, or the consent step fails.
+export const SCOPES = [
+  'read:jira-work',
+  'write:jira-work',
+  'read:jira-user',
+  'read:board-scope:jira-software',
+  'read:board-scope.admin:jira-software',
+  'read:project:jira',
+  'offline_access',
+].join(' ')
 
 export function getMainSession() {
   return useSession<SessionData>({ password: sessionPassword(), name: 'jiracule_session' })

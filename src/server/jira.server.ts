@@ -149,12 +149,11 @@ function parseBoardKey(key: string): { kind: BoardKind; id: string } {
   return { kind: key.slice(0, idx) as BoardKind, id: key.slice(idx + 1) }
 }
 
-// Every project (software / business / product-discovery / …) is surfaced as a
-// status-column board via the platform API. We deliberately avoid the Agile
-// board API (/rest/agile/1.0/board): under OAuth it rejects our token with a
-// bare 401 even though the granular jira-software board scopes are present — a
-// known Atlassian scope-matching quirk with the Agile endpoints. Status-column
-// boards work for all project types with the classic platform scopes.
+// Boards are enumerated from the project list (platform API), giving stable
+// `project-<id>` ids for URLs. The column *layout* is resolved separately in
+// boardColumns, which prefers the project's Agile board config and falls back to
+// a status-category heuristic. We list projects (not Agile boards) so every
+// project type appears even when it has no Agile board.
 export async function listBoards(auth: JiraAuth): Promise<Board[]> {
   const out: Board[] = []
   let startAt = 0
@@ -180,15 +179,53 @@ export async function listBoards(auth: JiraAuth): Promise<Board[]> {
 
 export async function boardColumns(auth: JiraAuth, boardKey: string): Promise<Column[]> {
   const { kind, id } = parseBoardKey(boardKey)
-  if (kind === 'project') return projectColumns(auth, id)
+  if (kind === 'agile') return agileColumns(auth, id)
 
+  // A project's Agile board (when it has one and our token can reach it) gives
+  // the authoritative side-by-side column layout. Fall back to the status-category
+  // heuristic for non-software projects, or when the Agile API rejects our token.
+  const agile = await agileColumnsForProject(auth, id)
+  return agile ?? projectColumns(auth, id)
+}
+
+// agileColumns maps an Agile board's column configuration into our Column shape.
+// Statuses mapped into one column are pooled into a single lane (as Jira renders
+// them), so no `statuses` field is set — the column drops onto its first status.
+async function agileColumns(auth: JiraAuth, boardId: string): Promise<Column[]> {
   const r = await jiraFetch<{
     columnConfig: { columns: Array<{ name: string; statuses: Array<{ id: string }> }> }
-  }>(auth, 'GET', `/rest/agile/1.0/board/${id}/configuration`)
-  return r!.columnConfig.columns.map((c) => ({
-    name: c.name,
-    statusIds: c.statuses.map((s) => s.id),
-  }))
+  }>(auth, 'GET', `/rest/agile/1.0/board/${boardId}/configuration`)
+  return (r!.columnConfig.columns ?? [])
+    .map((c) => ({ name: c.name, statusIds: c.statuses.map((s) => s.id) }))
+    .filter((c) => c.statusIds.length > 0) // drop unmapped columns (e.g. Backlog)
+}
+
+// agileColumnsForProject finds the project's first Agile board and returns its
+// column layout, or null when the project has no board or the Agile API rejects
+// our token (a JiraError) — the caller then uses the status-category heuristic.
+async function agileColumnsForProject(
+  auth: JiraAuth,
+  projectId: string,
+): Promise<Column[] | null> {
+  try {
+    const list = await jiraFetch<{
+      values: Array<{ id: number; location?: { projectId?: number } }>
+    }>(
+      auth,
+      'GET',
+      `/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(projectId)}&maxResults=50`,
+    )
+    const boards = list?.values ?? []
+    // The projectKeyOrId filter also returns boards that merely *include* the
+    // project (e.g. a multi-project board); prefer one actually located in it.
+    const board = boards.find((b) => String(b.location?.projectId) === projectId) ?? boards[0]
+    if (!board) return null
+    const cols = await agileColumns(auth, String(board.id))
+    return cols.length ? cols : null
+  } catch (e) {
+    if (e instanceof JiraError) return null
+    throw e
+  }
 }
 
 // projectColumns derives columns from a project's workflow statuses (there is no
