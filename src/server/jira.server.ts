@@ -44,12 +44,29 @@ async function jiraFetch<T>(
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
+    let extra = ''
+    if (res.status === 401 || res.status === 403) {
+      // Diagnostics: what does Jira object to, and what scopes does the token
+      // actually carry?
+      extra = ` [www-authenticate: ${res.headers.get('www-authenticate')}] [token scopes: ${tokenScopes(auth.token)}]`
+    }
     const message = await parseError(res)
-    console.error(`[jira] ${method} ${path} -> ${res.status}: ${message}`)
+    console.error(`[jira] ${method} ${path} -> ${res.status}: ${message}${extra}`)
     throw new JiraError(message, res.status)
   }
   if (res.status === 204) return undefined
   return (await res.json()) as T
+}
+
+// tokenScopes decodes the `scope` claim from the OAuth access token (a JWT) for
+// diagnostics — to tell whether a rejected scope is actually present.
+function tokenScopes(token: string): string {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'))
+    return payload.scope ?? '(no scope claim)'
+  } catch {
+    return '(token not a decodable JWT)'
+  }
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -132,53 +149,13 @@ function parseBoardKey(key: string): { kind: BoardKind; id: string } {
   return { kind: key.slice(0, idx) as BoardKind, id: key.slice(idx + 1) }
 }
 
+// Every project (software / business / product-discovery / …) is surfaced as a
+// status-column board via the platform API. We deliberately avoid the Agile
+// board API (/rest/agile/1.0/board): under OAuth it rejects our token with a
+// bare 401 even though the granular jira-software board scopes are present — a
+// known Atlassian scope-matching quirk with the Agile endpoints. Status-column
+// boards work for all project types with the classic platform scopes.
 export async function listBoards(auth: JiraAuth): Promise<Board[]> {
-  // Run both board sources independently: a failure of one (e.g. missing a
-  // Software scope) shouldn't hide the other. Only fail if both fail.
-  const [agile, projects] = await Promise.allSettled([
-    listAgileBoards(auth),
-    listProjectBoards(auth),
-  ])
-  const out: Board[] = []
-  if (agile.status === 'fulfilled') out.push(...agile.value)
-  else console.error('[jira] listAgileBoards failed:', (agile.reason as Error)?.message)
-  if (projects.status === 'fulfilled') out.push(...projects.value)
-  else console.error('[jira] listProjectBoards failed:', (projects.reason as Error)?.message)
-  if (agile.status === 'rejected' && projects.status === 'rejected') throw agile.reason
-  return out
-}
-
-async function listAgileBoards(auth: JiraAuth): Promise<Board[]> {
-  const out: Board[] = []
-  let startAt = 0
-  for (;;) {
-    const r = await jiraFetch<{
-      isLast: boolean
-      values: Array<{
-        id: number
-        name: string
-        type: string
-        location?: { projectKey?: string; projectName?: string }
-      }>
-    }>(auth, 'GET', `/rest/agile/1.0/board?maxResults=50&startAt=${startAt}`)
-    for (const v of r!.values) {
-      out.push({
-        id: `agile-${v.id}`,
-        name: v.name,
-        type: v.type,
-        projectKey: v.location?.projectKey,
-        projectName: v.location?.projectName,
-      })
-    }
-    if (r!.isLast || r!.values.length === 0) break
-    startAt += r!.values.length
-  }
-  return out
-}
-
-// listProjectBoards surfaces non-software projects (business / service) as
-// boards, since they have no Agile board of their own.
-async function listProjectBoards(auth: JiraAuth): Promise<Board[]> {
   const out: Board[] = []
   let startAt = 0
   for (;;) {
@@ -187,7 +164,6 @@ async function listProjectBoards(auth: JiraAuth): Promise<Board[]> {
       values: Array<{ id: string; key: string; name: string; projectTypeKey: string }>
     }>(auth, 'GET', `/rest/api/3/project/search?maxResults=50&startAt=${startAt}`)
     for (const p of r!.values) {
-      if (p.projectTypeKey === 'software') continue // already covered by Agile boards
       out.push({
         id: `project-${p.id}`,
         name: p.name,
@@ -419,6 +395,16 @@ export async function updateIssueDescription(
 ): Promise<void> {
   await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
     fields: { description: adfDoc(description) },
+  })
+}
+
+export async function updateIssueSummary(
+  auth: JiraAuth,
+  issueKey: string,
+  summary: string,
+): Promise<void> {
+  await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    fields: { summary },
   })
 }
 

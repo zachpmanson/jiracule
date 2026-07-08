@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import type { Assignee } from '../types'
 import type { InlineSegment } from '../types'
-import { useAddComment, useIssueDetail, useUpdateDescription } from '../queries'
+import {
+  useAddComment,
+  useIssueDetail,
+  useUpdateDescription,
+  useUpdateSummary,
+} from '../queries'
 import { RichText } from './Linkified'
 
 const segmentsToText = (segments: InlineSegment[]) => segments.map((s) => s.text).join('')
@@ -37,12 +42,24 @@ export function IssueDetailModal({
 }) {
   const { data: issue, isLoading, error } = useIssueDetail(issueKey)
   const updateDesc = useUpdateDescription(issueKey)
+  const updateSummary = useUpdateSummary(issueKey)
   const addComment = useAddComment(issueKey)
 
   const [editingDesc, setEditingDesc] = useState(false)
   const [descDraft, setDescDraft] = useState('')
   const [commentDraft, setCommentDraft] = useState('')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
 
+  function startEditTitle() {
+    setTitleDraft(issue?.summary ?? '')
+    setEditingTitle(true)
+  }
+  function saveTitle() {
+    const summary = titleDraft.trim()
+    if (!summary) return
+    updateSummary.mutate(summary, { onSuccess: () => setEditingTitle(false) })
+  }
   function startEdit() {
     setDescDraft(issue ? segmentsToText(issue.description) : '')
     setEditingDesc(true)
@@ -77,7 +94,36 @@ export function IssueDetailModal({
 
         {issue && (
           <>
-            <h2 className="detail-title">{issue.summary}</h2>
+            {editingTitle ? (
+              <div className="editor">
+                <textarea
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  rows={2}
+                  autoFocus
+                />
+                {updateSummary.isError && (
+                  <div className="inline-error">{(updateSummary.error as Error).message}</div>
+                )}
+                <div className="editor-actions">
+                  <button onClick={() => setEditingTitle(false)}>Cancel</button>
+                  <button
+                    className="primary"
+                    onClick={saveTitle}
+                    disabled={updateSummary.isPending || !titleDraft.trim()}
+                  >
+                    {updateSummary.isPending ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <h2 className="detail-title">
+                <span>{issue.summary}</span>
+                <button className="link-btn" onClick={startEditTitle}>
+                  Edit
+                </button>
+              </h2>
+            )}
 
             <dl className="detail-grid">
               <dt>Assignee</dt>

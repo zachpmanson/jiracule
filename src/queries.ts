@@ -12,6 +12,7 @@ import {
   moveIssue,
   searchIssues,
   updateIssueDescription,
+  updateIssueSummary,
 } from './server/jira.functions'
 
 export const keys = {
@@ -37,6 +38,18 @@ export function useUpdateDescription(issueKey: string) {
     mutationFn: (description: string) =>
       updateIssueDescription({ data: { issueKey, description } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(issueKey) }),
+  })
+}
+
+export function useUpdateSummary(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (summary: string) => updateIssueSummary({ data: { issueKey, summary } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
+      // The summary shows on board cards too, so refresh board data.
+      qc.invalidateQueries({ queryKey: ['boards'] })
+    },
   })
 }
 

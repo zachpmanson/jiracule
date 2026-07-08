@@ -251,12 +251,16 @@ button.primary {
 .board {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
-  overflow-x: auto;
+  align-items: stretch;
+  /* columns share the width equally and always fit — never scroll horizontally */
+  overflow-x: hidden;
   padding-bottom: 8px;
 }
 .column {
-  flex: 0 0 272px;
+  /* equal share of the board width; min-width:0 stops wide content from
+     stretching one column past the others */
+  flex: 1 1 0;
+  min-width: 0;
   background: var(--col-bg);
   border-radius: var(--radius);
   display: flex;
@@ -350,6 +354,7 @@ button.primary {
 }
 .card-summary {
   margin-bottom: 8px;
+  overflow-wrap: anywhere;
 }
 .card-meta {
   display: flex;
@@ -475,6 +480,13 @@ button.primary {
 .detail-title {
   margin: 4px 0 12px;
   font-size: 18px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.detail-title span {
+  overflow-wrap: anywhere;
 }
 .detail-grid {
   display: grid;

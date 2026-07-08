@@ -49,6 +49,11 @@ export const updateIssueDescription = createServerFn({ method: 'POST' })
     jira.updateIssueDescription(context.jira, data.issueKey, data.description),
   )
 
+export const updateIssueSummary = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string; summary: string }) => d)
+  .handler(({ data, context }) => jira.updateIssueSummary(context.jira, data.issueKey, data.summary))
+
 export const addIssueComment = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator((d: { issueKey: string; body: string }) => d)
