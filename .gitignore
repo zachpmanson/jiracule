@@ -1,0 +1,17 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+*.log
+
+# secrets
+.env
+
+# framework/build caches
+.nitro
+.tanstack
+.output
+.vinxi
+.wrangler
+__unconfig*
