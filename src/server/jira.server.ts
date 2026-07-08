@@ -1,6 +1,8 @@
 // Server-only Jira Cloud client. This module must only ever be imported from
-// inside server-function handlers — it reads the API token from the environment
-// and talks directly to Jira. The build keeps it out of the client bundle.
+// inside server-function handlers. Requests are authenticated per-user via the
+// OAuth access token in `JiraAuth` and go through the OAuth API base
+// (api.atlassian.com/ex/jira/{cloudId}). The build keeps it out of the client
+// bundle.
 import type {
   Assignee,
   Board,
@@ -14,6 +16,9 @@ import type {
   Transition,
   User,
 } from '../types'
+import type { JiraAuth } from './session.server'
+
+export type { JiraAuth }
 
 export class JiraError extends Error {
   status: number
@@ -23,32 +28,16 @@ export class JiraError extends Error {
   }
 }
 
-function config() {
-  const baseUrl = process.env.JIRA_BASE_URL?.replace(/\/+$/, '')
-  const email = process.env.JIRA_EMAIL
-  const token = process.env.JIRA_API_TOKEN
-  const missing = [
-    !baseUrl && 'JIRA_BASE_URL',
-    !email && 'JIRA_EMAIL',
-    !token && 'JIRA_API_TOKEN',
-  ].filter(Boolean)
-  if (missing.length) {
-    throw new JiraError(`missing required env vars: ${missing.join(', ')}`, 500)
-  }
-  const authHeader = 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64')
-  return { baseUrl: baseUrl!, authHeader }
-}
-
 async function jiraFetch<T>(
+  auth: JiraAuth,
   method: string,
   path: string,
   body?: unknown,
 ): Promise<T | undefined> {
-  const { baseUrl, authHeader } = config()
-  const res = await fetch(baseUrl + path, {
+  const res = await fetch(`https://api.atlassian.com/ex/jira/${auth.cloudId}${path}`, {
     method,
     headers: {
-      Authorization: authHeader,
+      Authorization: `Bearer ${auth.token}`,
       Accept: 'application/json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
@@ -115,13 +104,13 @@ function toIssue(ri: RawIssue): Issue {
 
 // --- API methods ---
 
-export async function myself(): Promise<User> {
+export async function myself(auth: JiraAuth): Promise<User> {
   const r = await jiraFetch<{
     accountId: string
     displayName: string
     emailAddress?: string
     avatarUrls?: Record<string, string>
-  }>('GET', '/rest/api/3/myself')
+  }>(auth, 'GET', '/rest/api/3/myself')
   return {
     accountId: r!.accountId,
     displayName: r!.displayName,
@@ -141,12 +130,12 @@ function parseBoardKey(key: string): { kind: BoardKind; id: string } {
   return { kind: key.slice(0, idx) as BoardKind, id: key.slice(idx + 1) }
 }
 
-export async function listBoards(): Promise<Board[]> {
-  const [agile, projects] = await Promise.all([listAgileBoards(), listProjectBoards()])
+export async function listBoards(auth: JiraAuth): Promise<Board[]> {
+  const [agile, projects] = await Promise.all([listAgileBoards(auth), listProjectBoards(auth)])
   return [...agile, ...projects]
 }
 
-async function listAgileBoards(): Promise<Board[]> {
+async function listAgileBoards(auth: JiraAuth): Promise<Board[]> {
   const out: Board[] = []
   let startAt = 0
   for (;;) {
@@ -158,7 +147,7 @@ async function listAgileBoards(): Promise<Board[]> {
         type: string
         location?: { projectKey?: string; projectName?: string }
       }>
-    }>('GET', `/rest/agile/1.0/board?maxResults=50&startAt=${startAt}`)
+    }>(auth, 'GET', `/rest/agile/1.0/board?maxResults=50&startAt=${startAt}`)
     for (const v of r!.values) {
       out.push({
         id: `agile-${v.id}`,
@@ -176,14 +165,14 @@ async function listAgileBoards(): Promise<Board[]> {
 
 // listProjectBoards surfaces non-software projects (business / service) as
 // boards, since they have no Agile board of their own.
-async function listProjectBoards(): Promise<Board[]> {
+async function listProjectBoards(auth: JiraAuth): Promise<Board[]> {
   const out: Board[] = []
   let startAt = 0
   for (;;) {
     const r = await jiraFetch<{
       isLast: boolean
       values: Array<{ id: string; key: string; name: string; projectTypeKey: string }>
-    }>('GET', `/rest/api/3/project/search?maxResults=50&startAt=${startAt}`)
+    }>(auth, 'GET', `/rest/api/3/project/search?maxResults=50&startAt=${startAt}`)
     for (const p of r!.values) {
       if (p.projectTypeKey === 'software') continue // already covered by Agile boards
       out.push({
@@ -200,13 +189,13 @@ async function listProjectBoards(): Promise<Board[]> {
   return out
 }
 
-export async function boardColumns(boardKey: string): Promise<Column[]> {
+export async function boardColumns(auth: JiraAuth, boardKey: string): Promise<Column[]> {
   const { kind, id } = parseBoardKey(boardKey)
-  if (kind === 'project') return projectColumns(id)
+  if (kind === 'project') return projectColumns(auth, id)
 
   const r = await jiraFetch<{
     columnConfig: { columns: Array<{ name: string; statuses: Array<{ id: string }> }> }
-  }>('GET', `/rest/agile/1.0/board/${id}/configuration`)
+  }>(auth, 'GET', `/rest/agile/1.0/board/${id}/configuration`)
   return r!.columnConfig.columns.map((c) => ({
     name: c.name,
     statusIds: c.statuses.map((s) => s.id),
@@ -216,7 +205,7 @@ export async function boardColumns(boardKey: string): Promise<Column[]> {
 // projectColumns derives columns from a project's workflow statuses (there is no
 // Agile column config for non-software projects). Each distinct status becomes a
 // one-status column, preserving first-seen (workflow) order across issue types.
-async function projectColumns(projectId: string): Promise<Column[]> {
+async function projectColumns(auth: JiraAuth, projectId: string): Promise<Column[]> {
   const r = await jiraFetch<
     Array<{
       statuses: Array<{
@@ -225,7 +214,7 @@ async function projectColumns(projectId: string): Promise<Column[]> {
         statusCategory?: { key: string; name: string }
       }>
     }>
-  >('GET', `/rest/api/3/project/${encodeURIComponent(projectId)}/statuses`)
+  >(auth, 'GET', `/rest/api/3/project/${encodeURIComponent(projectId)}/statuses`)
 
   // Jira Work Management boards use one column per status *category*
   // (To Do → In Progress → Done); statuses in the same category are stacked as
@@ -253,9 +242,9 @@ async function projectColumns(projectId: string): Promise<Column[]> {
     }))
 }
 
-export async function boardIssues(boardKey: string, jql: string): Promise<Issue[]> {
+export async function boardIssues(auth: JiraAuth, boardKey: string, jql: string): Promise<Issue[]> {
   const { kind, id } = parseBoardKey(boardKey)
-  if (kind === 'project') return projectIssues(id, jql)
+  if (kind === 'project') return projectIssues(auth, id, jql)
 
   const out: Issue[] = []
   let startAt = 0
@@ -267,6 +256,7 @@ export async function boardIssues(boardKey: string, jql: string): Promise<Issue[
     })
     if (jql) params.set('jql', jql)
     const r = await jiraFetch<{ total: number; issues: RawIssue[] }>(
+      auth,
       'GET',
       `/rest/agile/1.0/board/${id}/issue?${params.toString()}`,
     )
@@ -279,7 +269,7 @@ export async function boardIssues(boardKey: string, jql: string): Promise<Issue[
 
 // projectIssues fetches all issues of a project via JQL, paging with the search
 // endpoint's token pagination.
-async function projectIssues(projectId: string, extraJql: string): Promise<Issue[]> {
+async function projectIssues(auth: JiraAuth, projectId: string, extraJql: string): Promise<Issue[]> {
   const base = `project = ${projectId}`
   const jql = extraJql ? `${base} AND ${extraJql}` : base
   const out: Issue[] = []
@@ -292,6 +282,7 @@ async function projectIssues(projectId: string, extraJql: string): Promise<Issue
     }
     if (nextPageToken) body.nextPageToken = nextPageToken
     const r = await jiraFetch<{ issues: RawIssue[]; nextPageToken?: string }>(
+      auth,
       'POST',
       '/rest/api/3/search/jql',
       body,
@@ -303,10 +294,10 @@ async function projectIssues(projectId: string, extraJql: string): Promise<Issue
   return out
 }
 
-export async function transitions(issueKey: string): Promise<Transition[]> {
+export async function transitions(auth: JiraAuth, issueKey: string): Promise<Transition[]> {
   const r = await jiraFetch<{
     transitions: Array<{ id: string; name: string; to: { id: string; name: string } }>
-  }>('GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`)
+  }>(auth, 'GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`)
   return r!.transitions.map((t) => ({
     id: t.id,
     name: t.name,
@@ -315,14 +306,19 @@ export async function transitions(issueKey: string): Promise<Transition[]> {
   }))
 }
 
-export async function doTransition(issueKey: string, transitionId: string): Promise<void> {
-  await jiraFetch('POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`, {
+export async function doTransition(
+  auth: JiraAuth,
+  issueKey: string,
+  transitionId: string,
+): Promise<void> {
+  await jiraFetch(auth, 'POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`, {
     transition: { id: transitionId },
   })
 }
 
-export async function getIssue(issueKey: string): Promise<Issue> {
+export async function getIssue(auth: JiraAuth, issueKey: string): Promise<Issue> {
   const ri = await jiraFetch<RawIssue>(
+    auth,
     'GET',
     `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${ISSUE_FIELDS}`,
   )
@@ -345,8 +341,7 @@ function toAssignee(p?: RawPerson): Assignee | undefined {
 
 // getIssueDetail fetches the richer field set used by the detail modal and
 // flattens the ADF description into plain text.
-export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
-  const { baseUrl } = config()
+export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<IssueDetail> {
   const ri = await jiraFetch<
     RawIssue & {
       fields: RawIssue['fields'] & {
@@ -366,7 +361,7 @@ export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
         }
       }
     }
-  >('GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${DETAIL_FIELDS}`)
+  >(auth, 'GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${DETAIL_FIELDS}`)
   const base = toIssue(ri!)
   const f = ri!.fields
   const comments: Comment[] = (f.comment?.comments ?? []).map((c) => ({
@@ -383,12 +378,12 @@ export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
     labels: f.labels ?? [],
     created: f.created,
     updated: f.updated,
-    browseUrl: `${baseUrl}/browse/${encodeURIComponent(issueKey)}`,
+    browseUrl: `${auth.siteUrl}/browse/${encodeURIComponent(issueKey)}`,
     comments,
   }
 }
 
-export async function createIssue(input: CreateIssueInput): Promise<string> {
+export async function createIssue(auth: JiraAuth, input: CreateIssueInput): Promise<string> {
   const fields: Record<string, unknown> = {
     project: { key: input.projectKey },
     issuetype: { name: input.issueType },
@@ -396,28 +391,32 @@ export async function createIssue(input: CreateIssueInput): Promise<string> {
   }
   if (input.description) fields.description = adfDoc(input.description)
   if (input.assigneeId) fields.assignee = { accountId: input.assigneeId }
-  const r = await jiraFetch<{ key: string }>('POST', '/rest/api/3/issue', { fields })
+  const r = await jiraFetch<{ key: string }>(auth, 'POST', '/rest/api/3/issue', { fields })
   return r!.key
 }
 
-export async function deleteIssue(issueKey: string): Promise<void> {
-  await jiraFetch('DELETE', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`)
+export async function deleteIssue(auth: JiraAuth, issueKey: string): Promise<void> {
+  await jiraFetch(auth, 'DELETE', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`)
 }
 
-export async function updateIssueDescription(issueKey: string, description: string): Promise<void> {
-  await jiraFetch('PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+export async function updateIssueDescription(
+  auth: JiraAuth,
+  issueKey: string,
+  description: string,
+): Promise<void> {
+  await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
     fields: { description: adfDoc(description) },
   })
 }
 
-export async function addComment(issueKey: string, body: string): Promise<void> {
-  await jiraFetch('POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
+export async function addComment(auth: JiraAuth, issueKey: string, body: string): Promise<void> {
+  await jiraFetch(auth, 'POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
     body: adfDoc(body),
   })
 }
 
-export async function search(jql: string): Promise<Issue[]> {
-  const r = await jiraFetch<{ issues: RawIssue[] }>('POST', '/rest/api/3/search/jql', {
+export async function search(auth: JiraAuth, jql: string): Promise<Issue[]> {
+  const r = await jiraFetch<{ issues: RawIssue[] }>(auth, 'POST', '/rest/api/3/search/jql', {
     jql,
     fields: ISSUE_FIELDS.split(','),
     maxResults: 50,
@@ -428,14 +427,18 @@ export async function search(jql: string): Promise<Issue[]> {
 // Move an issue to a target status by finding a workflow transition whose
 // destination is that status and executing it. Moving by status (rather than
 // column) is unambiguous even when a column stacks several statuses.
-export async function moveIssue(issueKey: string, targetStatusId: string): Promise<Issue> {
-  const avail = await transitions(issueKey)
+export async function moveIssue(
+  auth: JiraAuth,
+  issueKey: string,
+  targetStatusId: string,
+): Promise<Issue> {
+  const avail = await transitions(auth, issueKey)
   const t = avail.find((tr) => tr.toStatusId === targetStatusId)
   if (!t) {
     throw new JiraError('no workflow transition from the current status into the target status', 409)
   }
-  await doTransition(issueKey, t.id)
-  return getIssue(issueKey)
+  await doTransition(auth, issueKey, t.id)
+  return getIssue(auth, issueKey)
 }
 
 // jqlQuote escapes a user string for embedding in a JQL double-quoted literal.

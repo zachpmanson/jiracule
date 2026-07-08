@@ -47,6 +47,43 @@ body {
   font-size: 12px;
 }
 
+/* --- connect / auth screen --- */
+.connect {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.connect-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 32px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+}
+.connect-card h1 {
+  margin: 0 0 4px;
+  color: var(--accent);
+}
+.connect-btn {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  text-decoration: none;
+}
+.logout {
+  color: var(--muted);
+  font-size: 13px;
+}
+.logout:hover {
+  color: var(--text);
+}
+
 /* --- top bar --- */
 .topbar {
   display: flex;

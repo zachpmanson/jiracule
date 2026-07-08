@@ -38,6 +38,11 @@ export function Header() {
           <span>{me.displayName}</span>
         </div>
       )}
+      <form method="post" action="/auth/logout">
+        <button type="submit" className="link-btn logout">
+          Log out
+        </button>
+      </form>
     </header>
   )
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Header } from '../components/Header'
+import { AuthGate } from '../components/AuthGate'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRoute({
@@ -33,10 +34,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <div className="app">
-            <Header />
-            <main className="content">{children}</main>
-          </div>
+          <AuthGate>
+            <div className="app">
+              <Header />
+              <main className="content">{children}</main>
+            </div>
+          </AuthGate>
         </QueryClientProvider>
         <Scripts />
       </body>
