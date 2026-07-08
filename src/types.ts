@@ -19,9 +19,18 @@ export interface Board {
   projectName?: string
 }
 
+export interface StatusRef {
+  id: string
+  name: string
+}
+
 export interface Column {
   name: string
   statusIds: string[]
+  // Named statuses within the column. When more than one, the UI renders them as
+  // stacked lanes (e.g. a "Done" column holding both Done and Abandoned). Absent
+  // for Agile boards, whose columns pool their mapped statuses without stacking.
+  statuses?: StatusRef[]
 }
 
 export interface Assignee {
@@ -41,16 +50,22 @@ export interface Issue {
   assignee?: Assignee
 }
 
+// A run of inline text; `href` set means it should render as a link.
+export interface InlineSegment {
+  text: string
+  href?: string
+}
+
 export interface Comment {
   id: string
   author?: Assignee
-  body: string
+  body: InlineSegment[]
   created?: string
   updated?: string
 }
 
 export interface IssueDetail extends Issue {
-  description?: string
+  description: InlineSegment[]
   reporter?: Assignee
   labels: string[]
   created?: string

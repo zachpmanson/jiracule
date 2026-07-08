@@ -220,9 +220,6 @@ button.primary {
   flex-direction: column;
   max-height: calc(100vh - 160px);
 }
-.column.over {
-  outline: 2px solid var(--accent);
-}
 .column-header {
   display: flex;
   justify-content: space-between;
@@ -242,6 +239,35 @@ button.primary {
   padding: 0 8px 8px;
   overflow-y: auto;
   min-height: 40px;
+}
+
+/* --- lane (status sub-section within a column) --- */
+.lane + .lane {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.lane-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lane-label .count {
+  background: var(--border);
+  border-radius: 10px;
+  padding: 0 6px;
+}
+.lane-body {
+  min-height: 24px;
+  border-radius: var(--radius);
+}
+.lane.over .lane-body {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* --- card --- */

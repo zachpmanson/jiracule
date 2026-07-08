@@ -41,8 +41,8 @@ export const addIssueComment = createServerFn({ method: 'POST' })
   .handler(({ data }) => jira.addComment(data.issueKey, data.body))
 
 export const moveIssue = createServerFn({ method: 'POST' })
-  .validator((d: { issueKey: string; boardId: string; targetColumnName: string }) => d)
-  .handler(({ data }) => jira.moveIssue(data.issueKey, data.boardId, data.targetColumnName))
+  .validator((d: { issueKey: string; targetStatusId: string }) => d)
+  .handler(({ data }) => jira.moveIssue(data.issueKey, data.targetStatusId))
 
 export const searchIssues = createServerFn({ method: 'GET' })
   .validator((d: { q: string; boardId?: string }) => d)

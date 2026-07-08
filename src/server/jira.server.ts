@@ -7,8 +7,10 @@ import type {
   Column,
   Comment,
   CreateIssueInput,
+  InlineSegment,
   Issue,
   IssueDetail,
+  StatusRef,
   Transition,
   User,
 } from '../types'
@@ -216,26 +218,39 @@ export async function boardColumns(boardKey: string): Promise<Column[]> {
 // one-status column, preserving first-seen (workflow) order across issue types.
 async function projectColumns(projectId: string): Promise<Column[]> {
   const r = await jiraFetch<
-    Array<{ statuses: Array<{ id: string; name: string; statusCategory?: { key: string } }> }>
+    Array<{
+      statuses: Array<{
+        id: string
+        name: string
+        statusCategory?: { key: string; name: string }
+      }>
+    }>
   >('GET', `/rest/api/3/project/${encodeURIComponent(projectId)}/statuses`)
 
-  // Jira orders Work Management board columns by status-category progression
-  // (To Do → In Progress → Done), not by the raw order this endpoint returns.
+  // Jira Work Management boards use one column per status *category*
+  // (To Do → In Progress → Done); statuses in the same category are stacked as
+  // lanes within that column (e.g. Done + Abandoned both under "Done").
   const categoryRank: Record<string, number> = { new: 0, indeterminate: 1, done: 2 }
+  type Cat = { key: string; name: string; statuses: StatusRef[] }
+  const byCategory = new Map<string, Cat>()
   const seen = new Set<string>()
-  const cols: Column[] = []
-  const rankById = new Map<string, number>()
   for (const issueType of r ?? []) {
     for (const s of issueType.statuses) {
       if (seen.has(s.id)) continue
       seen.add(s.id)
-      cols.push({ name: s.name, statusIds: [s.id] })
-      rankById.set(s.id, categoryRank[s.statusCategory?.key ?? ''] ?? 1)
+      const key = s.statusCategory?.key ?? 'indeterminate'
+      const name = s.statusCategory?.name ?? 'In Progress'
+      if (!byCategory.has(key)) byCategory.set(key, { key, name, statuses: [] })
+      byCategory.get(key)!.statuses.push({ id: s.id, name: s.name })
     }
   }
-  // Stable sort keeps within-category order as returned by Jira.
-  cols.sort((a, b) => rankById.get(a.statusIds[0])! - rankById.get(b.statusIds[0])!)
-  return cols
+  return [...byCategory.values()]
+    .sort((a, b) => (categoryRank[a.key] ?? 1) - (categoryRank[b.key] ?? 1))
+    .map((c) => ({
+      name: c.name,
+      statusIds: c.statuses.map((s) => s.id),
+      statuses: c.statuses,
+    }))
 }
 
 export async function boardIssues(boardKey: string, jql: string): Promise<Issue[]> {
@@ -357,13 +372,13 @@ export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
   const comments: Comment[] = (f.comment?.comments ?? []).map((c) => ({
     id: c.id,
     author: toAssignee(c.author),
-    body: adfToText(c.body) ?? '',
+    body: adfToRich(c.body),
     created: c.created,
     updated: c.updated,
   }))
   return {
     ...base,
-    description: adfToText(f.description),
+    description: adfToRich(f.description),
     reporter: toAssignee(f.reporter),
     labels: f.labels ?? [],
     created: f.created,
@@ -410,25 +425,14 @@ export async function search(jql: string): Promise<Issue[]> {
   return r!.issues.map(toIssue)
 }
 
-// Resolve the target board column to a status set, find a valid workflow
-// transition into it, execute it, and return the updated issue.
-export async function moveIssue(
-  issueKey: string,
-  boardKey: string,
-  targetColumnName: string,
-): Promise<Issue> {
-  const cols = await boardColumns(boardKey)
-  const col = cols.find((c) => c.name === targetColumnName)
-  if (!col) throw new JiraError(`unknown column: ${targetColumnName}`, 400)
-  const targetStatuses = new Set(col.statusIds)
-
+// Move an issue to a target status by finding a workflow transition whose
+// destination is that status and executing it. Moving by status (rather than
+// column) is unambiguous even when a column stacks several statuses.
+export async function moveIssue(issueKey: string, targetStatusId: string): Promise<Issue> {
   const avail = await transitions(issueKey)
-  const t = avail.find((tr) => targetStatuses.has(tr.toStatusId))
+  const t = avail.find((tr) => tr.toStatusId === targetStatusId)
   if (!t) {
-    throw new JiraError(
-      `no workflow transition from the current status into column "${targetColumnName}"`,
-      409,
-    )
+    throw new JiraError('no workflow transition from the current status into the target status', 409)
   }
   await doTransition(issueKey, t.id)
   return getIssue(issueKey)
@@ -439,32 +443,43 @@ export function jqlQuote(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-// adfToText flattens an Atlassian Document Format node tree into plain text,
-// inserting newlines between block-level nodes. Good enough for a read-only
-// detail view; rich rendering is out of scope for v1.
-function adfToText(node: unknown): string | undefined {
-  if (node == null || typeof node !== 'object') return undefined
+// adfToRich flattens an Atlassian Document Format node tree into inline segments,
+// preserving link targets so the frontend can render link-marked text as an <a>
+// tag on the label itself. Newlines between block-level nodes are kept as text.
+function adfToRich(node: unknown): InlineSegment[] {
+  if (node == null || typeof node !== 'object') return []
   const blockTypes = new Set(['paragraph', 'heading', 'listItem', 'blockquote', 'codeBlock'])
-  const walk = (n: any): string => {
-    if (!n || typeof n !== 'object') return ''
+  const out: InlineSegment[] = []
+  const push = (text: string, href?: string) => {
+    if (!text) return
+    out.push(href ? { text, href } : { text })
+  }
+  const walk = (n: any): void => {
+    if (!n || typeof n !== 'object') return
     if (n.type === 'text') {
       const text = typeof n.text === 'string' ? n.text : ''
-      // Preserve link targets so the frontend can linkify them. When the visible
-      // text isn't itself the URL, keep both: "label (https://…)".
       const href = Array.isArray(n.marks)
         ? n.marks.find((m: any) => m?.type === 'link')?.attrs?.href
         : undefined
-      return href && href !== text ? `${text} (${href})` : text
+      push(text, href)
+      return
     }
-    if (n.type === 'hardBreak') return '\n'
+    if (n.type === 'hardBreak') return push('\n')
     // Smart links / URL cards carry the URL in attrs, not as child text.
-    if (n.type === 'inlineCard' || n.type === 'blockCard') return n.attrs?.url ?? ''
+    if (n.type === 'inlineCard' || n.type === 'blockCard') {
+      const url = n.attrs?.url
+      if (url) push(url, url)
+      return
+    }
     const children: any[] = Array.isArray(n.content) ? n.content : []
-    const inner = children.map(walk).join('')
-    return blockTypes.has(n.type) ? inner + '\n' : inner
+    children.forEach(walk)
+    if (blockTypes.has(n.type)) push('\n')
   }
-  const text = walk(node).replace(/\n{3,}/g, '\n\n').trim()
-  return text || undefined
+  walk(node)
+  // Trim leading/trailing whitespace-only segments (e.g. the final block newline).
+  while (out.length && out[0].text.trim() === '' && !out[0].href) out.shift()
+  while (out.length && out[out.length - 1].text.trim() === '' && !out[out.length - 1].href) out.pop()
+  return out
 }
 
 // adfDoc wraps plain text in a minimal Atlassian Document Format document, which

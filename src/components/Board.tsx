@@ -24,54 +24,40 @@ export function Board({
 }) {
   const move = useMoveIssue(boardId)
 
-  // A small activation distance so clicking the delete button / reading a card
-  // doesn't start a drag.
+  // A small activation distance so clicking a card / its delete button doesn't
+  // start a drag.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  // statusId -> column name, and column name -> its primary (first) status id.
-  const statusToColumn = new Map<string, string>()
-  const columnPrimaryStatus = new Map<string, string>()
-  for (const c of columns) {
-    columnPrimaryStatus.set(c.name, c.statusIds[0])
-    for (const id of c.statusIds) statusToColumn.set(id, c.name)
-  }
+  // statusId -> owning column index (a status belongs to exactly one column).
+  const statusToColumn = new Map<string, number>()
+  columns.forEach((c, i) => c.statusIds.forEach((id) => statusToColumn.set(id, i)))
 
-  const byColumn: Record<string, Issue[]> = {}
-  for (const c of columns) byColumn[c.name] = []
+  const byColumn: Issue[][] = columns.map(() => [])
   for (const issue of issues) {
-    const col = statusToColumn.get(issue.statusId)
-    if (col) byColumn[col].push(issue) // unmapped statuses are hidden, as in Jira
+    const idx = statusToColumn.get(issue.statusId)
+    if (idx != null) byColumn[idx].push(issue) // unmapped statuses are hidden, as in Jira
   }
 
+  // A drop target's id is the destination status id (a lane). Dropping moves the
+  // issue to that status via a workflow transition.
   function onDragEnd(e: DragEndEvent) {
     const key = String(e.active.id)
-    const target = e.over ? String(e.over.id) : null
-    if (!target) return
-    const issue = issues.find((i) => i.key === key)
-    if (!issue) return
-    if (statusToColumn.get(issue.statusId) === target) return
-    const targetStatusId = columnPrimaryStatus.get(target)
+    const targetStatusId = e.over ? String(e.over.id) : null
     if (!targetStatusId) return
-    move.mutate({ issueKey: key, targetColumnName: target, targetStatusId })
+    const issue = issues.find((i) => i.key === key)
+    if (!issue || issue.statusId === targetStatusId) return
+    move.mutate({ issueKey: key, targetStatusId })
   }
 
   return (
     <>
       {move.isError && (
-        <div className="banner error">
-          Move failed: {(move.error as Error).message}
-        </div>
+        <div className="banner error">Move failed: {(move.error as Error).message}</div>
       )}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="board">
-          {columns.map((c) => (
-            <Column
-              key={c.name}
-              name={c.name}
-              issues={byColumn[c.name]}
-              onDelete={onDelete}
-              onOpen={onOpen}
-            />
+          {columns.map((c, i) => (
+            <Column key={c.name} column={c} issues={byColumn[i]} onDelete={onDelete} onOpen={onOpen} />
           ))}
         </div>
       </DndContext>

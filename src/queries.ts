@@ -87,15 +87,15 @@ export function useDeleteIssue(boardId: string) {
   })
 }
 
-type MoveVars = { issueKey: string; targetColumnName: string; targetStatusId: string }
+type MoveVars = { issueKey: string; targetStatusId: string }
 
-// Optimistically moves the card to the target column, rolling back if the
+// Optimistically moves the card to the target status, rolling back if the
 // workflow rejects the transition, then reconciles with a refetch.
 export function useMoveIssue(boardId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ issueKey, targetColumnName }: MoveVars) =>
-      moveIssue({ data: { issueKey, boardId, targetColumnName } }),
+    mutationFn: ({ issueKey, targetStatusId }: MoveVars) =>
+      moveIssue({ data: { issueKey, targetStatusId } }),
     onMutate: async ({ issueKey, targetStatusId }: MoveVars) => {
       await qc.cancelQueries({ queryKey: keys.issues(boardId) })
       const prev = qc.getQueryData<Issue[]>(keys.issues(boardId))

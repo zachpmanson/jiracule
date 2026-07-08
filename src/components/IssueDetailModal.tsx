@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { Assignee } from '../types'
+import type { InlineSegment } from '../types'
 import { useAddComment, useIssueDetail, useUpdateDescription } from '../queries'
-import { Linkified } from './Linkified'
+import { RichText } from './Linkified'
+
+const segmentsToText = (segments: InlineSegment[]) => segments.map((s) => s.text).join('')
 
 function Person({ person }: { person?: Assignee }) {
   if (!person) return <span className="muted">Unassigned</span>
@@ -41,7 +44,7 @@ export function IssueDetailModal({
   const [commentDraft, setCommentDraft] = useState('')
 
   function startEdit() {
-    setDescDraft(issue?.description ?? '')
+    setDescDraft(issue ? segmentsToText(issue.description) : '')
     setEditingDesc(true)
   }
   function saveDesc() {
@@ -137,8 +140,8 @@ export function IssueDetailModal({
               </div>
             ) : (
               <div className="detail-desc">
-                {issue.description ? (
-                  <Linkified text={issue.description} />
+                {issue.description.length ? (
+                  <RichText segments={issue.description} />
                 ) : (
                   <span className="muted">No description</span>
                 )}
@@ -155,7 +158,7 @@ export function IssueDetailModal({
                       <span className="muted">{fmtDate(c.updated ?? c.created)}</span>
                     </div>
                     <div className="comment-body">
-                      <Linkified text={c.body} />
+                      <RichText segments={c.body} />
                     </div>
                   </li>
                 ))}
