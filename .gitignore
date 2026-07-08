@@ -15,3 +15,7 @@ dist-ssr
 .vinxi
 .wrangler
 __unconfig*
+
+# nix build output
+result
+result-*

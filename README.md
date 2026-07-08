@@ -14,14 +14,14 @@ the browser.
 
 1. Register an **OAuth 2.0 (3LO)** app at
    [developer.atlassian.com/console/myapps](https://developer.atlassian.com/console/myapps/):
-   - Add the **Jira** permission with scopes
-     `read:jira-work write:jira-work read:jira-user offline_access`.
+   - Add the **Jira** permission and enable these **granular** scopes (plus
+     `offline_access`): `read:issue:jira read:issue-details:jira read:issue-meta:jira read:issue.transition:jira read:field:jira read:status:jira read:issue-type:jira read:priority:jira read:project:jira read:user:jira read:comment:jira write:issue:jira write:comment:jira delete:issue:jira read:board-scope:jira-software read:board-scope.admin:jira-software`.
    - Set the callback URL to `http://localhost:3000/auth/callback`.
-2. Configure and run:
+2. Configure and run (uses **pnpm**):
    ```bash
    cp .env.example .env   # fill in the values below
-   npm install
-   npm run dev            # http://localhost:3000
+   pnpm install
+   pnpm dev               # http://localhost:3000
    ```
 
 `.env` (auto-loaded in dev and by the built server):
@@ -56,18 +56,43 @@ Then open the app and click **Connect Jira** to authorize.
 *transition* into a status belonging to the target column (resolved server-side).
 Illegal moves surface an error and the optimistic move rolls back.
 
-## Build / deploy
+## Build / run production
+
+The Vite build uses a **Nitro node-server** target, emitting a standalone server:
 
 ```bash
-npm run build      # emits dist/client + dist/server (a fetch-handler module)
+pnpm build                     # -> .output/server/index.mjs
+node .output/server/index.mjs  # honours PORT / HOST
 ```
 
-`npm run dev` is the supported local run today and works fully (server functions
-included). The app is deployment-*ready* — secrets come from env, and the server
-functions are the only server surface — but hosting needs a deployment adapter
-added (Node/Nitro/Cloudflare), e.g. `npx @tanstack/cli add` a target, set the same
-env vars in the host, and add the host's callback URL to the OAuth app. That's
-intentionally left for "deploy later".
+## NixOS
+
+Packaged as a flake (`flake.nix` + `nix/package.nix` + `nix/module.nix`):
+
+```bash
+nix build            # builds the .output node server into ./result
+node result/server/index.mjs
+```
+
+As a NixOS service, import the module and enable it:
+
+```nix
+# flake inputs: jiracule.url = "github:zachpmanson/jiracule";
+imports = [ jiracule.nixosModules.default ];
+services.jiracule = {
+  enable = true;
+  port = 3000;
+  hostname = "0.0.0.0";
+  openFirewall = true;
+  # Secrets kept out of the Nix store (ATLASSIAN_CLIENT_ID/SECRET,
+  # OAUTH_REDIRECT_URI, SESSION_SECRET):
+  environmentFile = "/run/secrets/jiracule.env";
+};
+```
+
+The module runs the server via systemd (`DynamicUser`, hardened) on the chosen
+port. When the pnpm lockfile changes, `nix build` will print the new
+`pnpmDeps` hash to paste into `nix/package.nix`.
 
 ## Not in v1
 
