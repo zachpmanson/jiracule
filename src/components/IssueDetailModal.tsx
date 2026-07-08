@@ -111,7 +111,7 @@ export function IssueDetailModal({
                   title="Change status"
                 >
                   <option value="">
-                    {applyTransition.isPending ? 'Updating…' : issue.statusName} ▾
+                    {applyTransition.isPending ? 'Updating…' : issue.statusName}
                   </option>
                   {transitions.map((t) => (
                     <option key={t.id} value={t.id}>
