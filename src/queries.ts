@@ -1,15 +1,23 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { CreateIssueInput, Issue } from './types'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryKey,
+} from '@tanstack/react-query'
+import type { CreateIssueInput, Issue, LanePage } from './types'
 import {
   addIssueComment,
   createIssue,
   deleteIssue,
   getAssignableUsers,
+  getBoardAssignees,
   getBoardColumns,
-  getBoardIssues,
   getBoards,
   getIssueDetail,
   getIssueTransitions,
+  getLaneIssues,
   getMe,
   moveIssue,
   searchIssues,
@@ -23,7 +31,13 @@ export const keys = {
   me: ['me'] as const,
   boards: ['boards'] as const,
   columns: (boardId: string) => ['boards', boardId, 'columns'] as const,
-  issues: (boardId: string) => ['boards', boardId, 'issues'] as const,
+  boardAssignees: (projectKey: string) => ['boards', projectKey, 'assignees'] as const,
+  // Prefix matching every lane query of a board (for bulk invalidation).
+  lanes: (boardId: string) => ['board', boardId, 'lane'] as const,
+  // A single lane's paginated issues. statusIds are sorted so the key is stable
+  // regardless of column ordering; assigneeId keys the active filter.
+  laneIssues: (boardId: string, statusIds: string[], assigneeId?: string) =>
+    ['board', boardId, 'lane', [...statusIds].sort().join(','), assigneeId ?? 'all'] as const,
   issue: (issueKey: string) => ['issue', issueKey] as const,
   assignable: (issueKey: string) => ['issue', issueKey, 'assignable'] as const,
   transitions: (issueKey: string) => ['issue', issueKey, 'transitions'] as const,
@@ -128,10 +142,25 @@ export function useBoardColumns(boardId: string) {
   })
 }
 
-export function useBoardIssues(boardId: string) {
+// One lane's issues, paginated. assigneeId (undefined = all) narrows the query
+// server-side. Callers flatten `data.pages` for rendering and read the first
+// page's `total` for the count badge.
+export function useLaneIssues(boardId: string, statusIds: string[], assigneeId?: string) {
+  return useInfiniteQuery({
+    queryKey: keys.laneIssues(boardId, statusIds, assigneeId),
+    queryFn: ({ pageParam }) =>
+      getLaneIssues({ data: { boardId, statusIds, assigneeId, cursor: pageParam } }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+export function useBoardAssignees(projectKey: string) {
   return useQuery({
-    queryKey: keys.issues(boardId),
-    queryFn: () => getBoardIssues({ data: { boardId } }),
+    queryKey: keys.boardAssignees(projectKey),
+    queryFn: () => getBoardAssignees({ data: { projectKey } }),
+    enabled: !!projectKey,
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -139,7 +168,7 @@ export function useCreateIssue(boardId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateIssueInput) => createIssue({ data: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issues(boardId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }),
   })
 }
 
@@ -147,34 +176,94 @@ export function useDeleteIssue(boardId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (issueKey: string) => deleteIssue({ data: { issueKey } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issues(boardId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }),
   })
 }
 
-type MoveVars = { issueKey: string; targetStatusId: string }
+type LaneData = InfiniteData<LanePage, string | undefined>
+type MoveVars = {
+  issueKey: string
+  issue: Issue
+  sourceKey: QueryKey
+  targetKey: QueryKey
+  targetStatusId: string
+}
 
-// Optimistically moves the card to the target status, rolling back if the
+// Remove an issue from a lane's paged cache, decrementing its total.
+function removeFromLane(data: LaneData | undefined, issueKey: string): LaneData | undefined {
+  if (!data) return data
+  return {
+    ...data,
+    pages: data.pages.map((p, i) => ({
+      ...p,
+      issues: p.issues.filter((x) => x.key !== issueKey),
+      total: i === 0 && p.total != null ? Math.max(0, p.total - 1) : p.total,
+    })),
+  }
+}
+
+// Prepend an issue to a lane's first page, incrementing its total.
+function prependToLane(data: LaneData | undefined, issue: Issue): LaneData | undefined {
+  if (!data) return data
+  return {
+    ...data,
+    pages: data.pages.map((p, i) =>
+      i === 0
+        ? {
+            ...p,
+            issues: [issue, ...p.issues.filter((x) => x.key !== issue.key)],
+            total: p.total != null ? p.total + 1 : p.total,
+          }
+        : { ...p, issues: p.issues.filter((x) => x.key !== issue.key) },
+    ),
+  }
+}
+
+// Optimistically moves the card from its source lane into the target lane (or
+// just flips its status within a pooled lane), rolling back both caches if the
 // workflow rejects the transition, then reconciles with a refetch.
-export function useMoveIssue(boardId: string) {
+export function useMoveIssue() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ issueKey, targetStatusId }: MoveVars) =>
       moveIssue({ data: { issueKey, targetStatusId } }),
-    onMutate: async ({ issueKey, targetStatusId }: MoveVars) => {
-      await qc.cancelQueries({ queryKey: keys.issues(boardId) })
-      const prev = qc.getQueryData<Issue[]>(keys.issues(boardId))
-      if (prev) {
-        qc.setQueryData<Issue[]>(
-          keys.issues(boardId),
-          prev.map((i) => (i.key === issueKey ? { ...i, statusId: targetStatusId } : i)),
+    onMutate: async ({ issueKey, issue, sourceKey, targetKey, targetStatusId }: MoveVars) => {
+      const sameLane = JSON.stringify(sourceKey) === JSON.stringify(targetKey)
+      await qc.cancelQueries({ queryKey: sourceKey })
+      const prevSource = qc.getQueryData<LaneData>(sourceKey)
+      const moved = { ...issue, statusId: targetStatusId }
+      if (sameLane) {
+        // Status changes but the card stays in the same (pooled) lane.
+        qc.setQueryData<LaneData>(sourceKey, (d) =>
+          d
+            ? {
+                ...d,
+                pages: d.pages.map((p) => ({
+                  ...p,
+                  issues: p.issues.map((x) => (x.key === issueKey ? moved : x)),
+                })),
+              }
+            : d,
         )
+        return { prevSource, prevTarget: undefined, sourceKey, targetKey }
       }
-      return { prev }
+      await qc.cancelQueries({ queryKey: targetKey })
+      const prevTarget = qc.getQueryData<LaneData>(targetKey)
+      qc.setQueryData<LaneData>(sourceKey, (d) => removeFromLane(d, issueKey))
+      qc.setQueryData<LaneData>(targetKey, (d) => prependToLane(d, moved))
+      return { prevSource, prevTarget, sourceKey, targetKey }
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(keys.issues(boardId), ctx.prev)
+      if (!ctx) return
+      if (ctx.prevSource) qc.setQueryData(ctx.sourceKey, ctx.prevSource)
+      if (ctx.prevTarget) qc.setQueryData(ctx.targetKey, ctx.prevTarget)
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.issues(boardId) }),
+    onSettled: (_data, _err, _vars, ctx) => {
+      if (!ctx) return
+      qc.invalidateQueries({ queryKey: ctx.sourceKey })
+      if (JSON.stringify(ctx.sourceKey) !== JSON.stringify(ctx.targetKey))
+        qc.invalidateQueries({ queryKey: ctx.targetKey })
+    },
   })
 }
 

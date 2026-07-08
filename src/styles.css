@@ -369,6 +369,20 @@ button.search-item:hover {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+/* Per-lane loading / empty / error rows and the infinite-scroll sentinel. */
+.lane-note {
+  padding: 6px 4px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.lane-note.error {
+  color: var(--danger);
+  text-align: left;
+}
+.lane-sentinel {
+  height: 1px;
+}
 
 /* --- card --- */
 .card {

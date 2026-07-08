@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
-import type { Assignee } from '../types'
 import {
+  useBoardAssignees,
   useBoardColumns,
-  useBoardIssues,
   useBoards,
   useDeleteIssue,
   useMe,
@@ -29,7 +28,7 @@ export function BoardPage() {
   const { data: boards } = useBoards()
   const board = boards?.find((b) => b.id === boardId)
   const columnsQ = useBoardColumns(boardId)
-  const issuesQ = useBoardIssues(boardId)
+  const assigneesQ = useBoardAssignees(board?.projectKey ?? '')
   const del = useDeleteIssue(boardId)
 
   // Filters live in the URL so they persist across reloads and are shareable.
@@ -42,33 +41,23 @@ export function BoardPage() {
   const setJqlMode = (on: boolean) =>
     navigate({ search: (p) => ({ ...p, jql: on || undefined }), replace: true })
 
+  // Resolve the URL filter into the accountId the lane queries filter by
+  // server-side (undefined = no filter). "Me" waits on the current user.
+  const assigneeId =
+    assigneeFilter === ALL ? undefined : assigneeFilter === MINE ? me?.accountId : assigneeFilter
+
   const [creating, setCreating] = useState(false)
   const [openIssueKey, setOpenIssueKey] = useState<string | null>(null)
 
-  const issues = issuesQ.data ?? []
-
-  // Unique assignees present on the board, for the filter dropdown.
-  const assignees = useMemo(() => {
-    const map = new Map<string, Assignee>()
-    for (const i of issues) if (i.assignee) map.set(i.assignee.accountId, i.assignee)
-    return [...map.values()].sort((a, b) => a.displayName.localeCompare(b.displayName))
-  }, [issues])
-
-  const filtered = useMemo(() => {
-    if (assigneeFilter === ALL) return issues
-    if (assigneeFilter === MINE)
-      return issues.filter((i) => i.assignee?.accountId === me?.accountId)
-    return issues.filter((i) => i.assignee?.accountId === assigneeFilter)
-  }, [issues, assigneeFilter, me])
+  const assignees = assigneesQ.data ?? []
 
   function handleDelete(key: string) {
     if (window.confirm(`Delete ${key}? This cannot be undone.`)) del.mutate(key)
   }
 
-  if (columnsQ.isLoading || issuesQ.isLoading)
-    return <div className="placeholder">Loading board…</div>
-  const err = columnsQ.error ?? issuesQ.error
-  if (err) return <div className="placeholder error">{errMsg(err)}</div>
+  // Lanes own their own loading/error now, so the board only waits on columns.
+  if (columnsQ.isLoading) return <div className="placeholder">Loading board…</div>
+  if (columnsQ.error) return <div className="placeholder error">{errMsg(columnsQ.error)}</div>
 
   return (
     <div className="board-page">
@@ -99,7 +88,7 @@ export function BoardPage() {
       <Board
         boardId={boardId}
         columns={columnsQ.data ?? []}
-        issues={filtered}
+        assigneeId={assigneeId}
         onDelete={handleDelete}
         onOpen={setOpenIssueKey}
       />

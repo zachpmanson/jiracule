@@ -19,10 +19,17 @@ export const getBoardColumns = createServerFn({ method: 'GET' })
   .validator((d: { boardId: string }) => d)
   .handler(({ data, context }) => jira.boardColumns(context.jira, data.boardId))
 
-export const getBoardIssues = createServerFn({ method: 'GET' })
+export const getLaneIssues = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator((d: { boardId: string }) => d)
-  .handler(({ data, context }) => jira.boardIssues(context.jira, data.boardId, ''))
+  .validator((d: { boardId: string; statusIds: string[]; assigneeId?: string; cursor?: string }) => d)
+  .handler(({ data, context }) =>
+    jira.laneIssues(context.jira, data.boardId, data.statusIds, data.assigneeId, data.cursor),
+  )
+
+export const getBoardAssignees = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .validator((d: { projectKey: string }) => d)
+  .handler(({ data, context }) => jira.boardAssignees(context.jira, data.projectKey))
 
 export const getIssueDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])

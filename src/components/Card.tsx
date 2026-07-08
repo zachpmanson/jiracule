@@ -1,4 +1,5 @@
 import { useDraggable } from '@dnd-kit/core'
+import type { QueryKey } from '@tanstack/react-query'
 import type { Issue } from '../types'
 import { Avatar } from './Avatar'
 
@@ -18,8 +19,23 @@ function CardInner({ issue }: { issue: Issue }) {
   )
 }
 
-export function Card({ issue, onDelete, onOpen }: { issue: Issue; onDelete: (key: string) => void; onOpen: (key: string) => void }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: issue.key })
+export function Card({
+  issue,
+  sourceKey,
+  onDelete,
+  onOpen,
+}: {
+  issue: Issue
+  sourceKey: QueryKey
+  onDelete: (key: string) => void
+  onOpen: (key: string) => void
+}) {
+  // The draggable carries the issue and its owning lane's query key so the drop
+  // handler can move it between lane caches without a flat board array.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: issue.key,
+    data: { issue, sourceKey },
+  })
 
   // No in-place transform: the moving copy is rendered in a DragOverlay so it
   // floats above the scroll containers instead of being clipped by them. The

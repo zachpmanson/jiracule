@@ -12,6 +12,7 @@ import type {
   InlineSegment,
   Issue,
   IssueDetail,
+  LanePage,
   StatusRef,
   Transition,
   User,
@@ -100,6 +101,10 @@ interface RawIssue {
 }
 
 const ISSUE_FIELDS = 'summary,status,assignee,issuetype,priority'
+
+// Cards fetched per lane per page — small enough that a lane renders fast and
+// infinite scroll feels responsive.
+const LANE_PAGE_SIZE = 25
 
 function toIssue(ri: RawIssue): Issue {
   const f = ri.fields
@@ -268,56 +273,66 @@ async function projectColumns(auth: JiraAuth, projectId: string): Promise<Column
     }))
 }
 
-export async function boardIssues(auth: JiraAuth, boardKey: string, jql: string): Promise<Issue[]> {
-  const { kind, id } = parseBoardKey(boardKey)
-  if (kind === 'project') return projectIssues(auth, id, jql)
+// laneIssues fetches one page of a lane's issues. A lane targets one or more
+// statuses (an Agile column pools several); the board id is always `project-<id>`,
+// so we query by JQL and page with the search endpoint's opaque cursor. The
+// approximate total is fetched once, on the first page (cursor undefined), since
+// the /search/jql endpoint no longer returns `total`.
+export async function laneIssues(
+  auth: JiraAuth,
+  boardKey: string,
+  statusIds: string[],
+  assigneeId?: string,
+  cursor?: string,
+): Promise<LanePage> {
+  const { id: projectId } = parseBoardKey(boardKey)
+  const clauses = [`project = ${projectId}`]
+  if (statusIds.length) clauses.push(`status IN (${statusIds.join(',')})`)
+  if (assigneeId) clauses.push(`assignee = "${jqlQuote(assigneeId)}"`)
+  const jql = `${clauses.join(' AND ')} ORDER BY created DESC`
 
-  const out: Issue[] = []
-  let startAt = 0
-  for (;;) {
-    const params = new URLSearchParams({
-      fields: ISSUE_FIELDS,
-      maxResults: '100',
-      startAt: String(startAt),
-    })
-    if (jql) params.set('jql', jql)
-    const r = await jiraFetch<{ total: number; issues: RawIssue[] }>(
-      auth,
-      'GET',
-      `/rest/agile/1.0/board/${id}/issue?${params.toString()}`,
-    )
-    for (const ri of r!.issues) out.push(toIssue(ri))
-    startAt += r!.issues.length
-    if (r!.issues.length === 0 || startAt >= r!.total) break
+  const body: Record<string, unknown> = {
+    jql,
+    fields: ISSUE_FIELDS.split(','),
+    maxResults: LANE_PAGE_SIZE,
   }
-  return out
-}
+  if (cursor) body.nextPageToken = cursor
+  const page = await jiraFetch<{ issues: RawIssue[]; nextPageToken?: string }>(
+    auth,
+    'POST',
+    '/rest/api/3/search/jql',
+    body,
+  )
 
-// projectIssues fetches all issues of a project via JQL, paging with the search
-// endpoint's token pagination.
-async function projectIssues(auth: JiraAuth, projectId: string, extraJql: string): Promise<Issue[]> {
-  const base = `project = ${projectId}`
-  const jql = extraJql ? `${base} AND ${extraJql}` : base
-  const out: Issue[] = []
-  let nextPageToken: string | undefined
-  for (;;) {
-    const body: Record<string, unknown> = {
-      jql: `${jql} ORDER BY created DESC`,
-      fields: ISSUE_FIELDS.split(','),
-      maxResults: 100,
-    }
-    if (nextPageToken) body.nextPageToken = nextPageToken
-    const r = await jiraFetch<{ issues: RawIssue[]; nextPageToken?: string }>(
+  // Only pay for the count once, on the first page.
+  let total: number | null = null
+  if (!cursor) {
+    const c = await jiraFetch<{ count: number }>(
       auth,
       'POST',
-      '/rest/api/3/search/jql',
-      body,
+      '/rest/api/3/search/approximate-count',
+      { jql },
     )
-    for (const ri of r!.issues) out.push(toIssue(ri))
-    if (!r!.nextPageToken || r!.issues.length === 0) break
-    nextPageToken = r!.nextPageToken
+    total = c?.count ?? null
   }
-  return out
+
+  return {
+    issues: (page?.issues ?? []).map(toIssue),
+    nextCursor: page?.nextPageToken ?? null,
+    total,
+  }
+}
+
+// boardAssignees lists the people assignable in the board's project — the source
+// for the assignee filter dropdown (which can't be derived from loaded issues
+// once lanes are paginated).
+export async function boardAssignees(auth: JiraAuth, projectKey: string): Promise<Assignee[]> {
+  const r = await jiraFetch<RawPerson[]>(
+    auth,
+    'GET',
+    `/rest/api/3/user/assignable/search?project=${encodeURIComponent(projectKey)}&maxResults=100`,
+  )
+  return (r ?? []).map((p) => toAssignee(p)!).filter(Boolean)
 }
 
 export async function transitions(auth: JiraAuth, issueKey: string): Promise<Transition[]> {
