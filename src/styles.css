@@ -252,14 +252,14 @@ button.primary {
   display: flex;
   gap: 12px;
   align-items: stretch;
-  /* columns share the width equally and always fit — never scroll horizontally */
-  overflow-x: hidden;
+  /* the board scrolls sideways when there are more columns than fit */
+  overflow-x: auto;
   padding-bottom: 8px;
 }
 .column {
-  /* equal share of the board width; min-width:0 stops wide content from
-     stretching one column past the others */
-  flex: 1 1 0;
+  /* every column is the same fixed width; min-width:0 keeps a wide card from
+     stretching one column past the others (it scrolls inside the lane instead) */
+  flex: 0 0 300px;
   min-width: 0;
   background: var(--col-bg);
   border-radius: var(--radius);
@@ -323,7 +323,8 @@ button.primary {
 .lane-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  /* vertical scroll for many cards; horizontal scroll for a too-wide card */
+  overflow: auto;
   border-radius: var(--radius);
 }
 .lane.over .lane-body {
@@ -354,7 +355,6 @@ button.primary {
 }
 .card-summary {
   margin-bottom: 8px;
-  overflow-wrap: anywhere;
 }
 .card-meta {
   display: flex;
