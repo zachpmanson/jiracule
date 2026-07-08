@@ -471,7 +471,10 @@ export function jqlQuote(s: string): string {
 // tag on the label itself. Newlines between block-level nodes are kept as text.
 function adfToRich(node: unknown): InlineSegment[] {
   if (node == null || typeof node !== 'object') return []
-  const blockTypes = new Set(['paragraph', 'heading', 'listItem', 'blockquote', 'codeBlock'])
+  // A paragraph/heading/etc. ends a block, so it's separated from the next block
+  // by a blank line; list items sit on consecutive lines (single newline).
+  const paragraphBreak = new Set(['paragraph', 'heading', 'blockquote', 'codeBlock'])
+  const lineBreak = new Set(['listItem'])
   const out: InlineSegment[] = []
   const push = (text: string, href?: string) => {
     if (!text) return
@@ -496,22 +499,46 @@ function adfToRich(node: unknown): InlineSegment[] {
     }
     const children: any[] = Array.isArray(n.content) ? n.content : []
     children.forEach(walk)
-    if (blockTypes.has(n.type)) push('\n')
+    if (paragraphBreak.has(n.type)) push('\n\n')
+    else if (lineBreak.has(n.type)) push('\n')
   }
   walk(node)
-  // Trim leading/trailing whitespace-only segments (e.g. the final block newline).
-  while (out.length && out[0].text.trim() === '' && !out[0].href) out.shift()
-  while (out.length && out[out.length - 1].text.trim() === '' && !out[out.length - 1].href) out.pop()
-  return out
+  // Collapse adjacent newline-only segments and cap them at a single blank line
+  // (two newlines) so paragraph breaks show without stacking up.
+  const norm: InlineSegment[] = []
+  for (const seg of out) {
+    if (!seg.href && /^\n+$/.test(seg.text)) {
+      const prev = norm[norm.length - 1]
+      if (prev && !prev.href && /^\n+$/.test(prev.text)) {
+        prev.text = '\n'.repeat(Math.min(2, prev.text.length + seg.text.length))
+        continue
+      }
+      norm.push({ text: '\n'.repeat(Math.min(2, seg.text.length)) })
+      continue
+    }
+    norm.push(seg)
+  }
+  // Trim leading/trailing whitespace-only segments (e.g. the final block break).
+  while (norm.length && norm[0].text.trim() === '' && !norm[0].href) norm.shift()
+  while (norm.length && norm[norm.length - 1].text.trim() === '' && !norm[norm.length - 1].href)
+    norm.pop()
+  return norm
 }
 
 // adfDoc wraps plain text in a minimal Atlassian Document Format document, which
 // the v3 create-issue endpoint requires for rich-text fields like description.
 function adfDoc(text: string) {
-  // Split on newlines into paragraphs; empty text yields a single empty
+  // Mirror adfToRich: blank lines separate paragraphs, and single newlines
+  // within a paragraph become hard breaks. Empty text yields a single empty
   // paragraph (valid ADF — an empty text node is not).
-  const content = text.split('\n').map((line) =>
-    line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' },
-  )
+  const content = text.split(/\n{2,}/).map((para) => {
+    const lines = para.split('\n')
+    const inline: unknown[] = []
+    lines.forEach((line, i) => {
+      if (i > 0) inline.push({ type: 'hardBreak' })
+      if (line) inline.push({ type: 'text', text: line })
+    })
+    return inline.length ? { type: 'paragraph', content: inline } : { type: 'paragraph' }
+  })
   return { type: 'doc', version: 1, content }
 }
