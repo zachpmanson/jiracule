@@ -216,17 +216,25 @@ export async function boardColumns(boardKey: string): Promise<Column[]> {
 // one-status column, preserving first-seen (workflow) order across issue types.
 async function projectColumns(projectId: string): Promise<Column[]> {
   const r = await jiraFetch<
-    Array<{ statuses: Array<{ id: string; name: string }> }>
+    Array<{ statuses: Array<{ id: string; name: string; statusCategory?: { key: string } }> }>
   >('GET', `/rest/api/3/project/${encodeURIComponent(projectId)}/statuses`)
+
+  // Jira orders Work Management board columns by status-category progression
+  // (To Do → In Progress → Done), not by the raw order this endpoint returns.
+  const categoryRank: Record<string, number> = { new: 0, indeterminate: 1, done: 2 }
   const seen = new Set<string>()
   const cols: Column[] = []
+  const rankById = new Map<string, number>()
   for (const issueType of r ?? []) {
     for (const s of issueType.statuses) {
       if (seen.has(s.id)) continue
       seen.add(s.id)
       cols.push({ name: s.name, statusIds: [s.id] })
+      rankById.set(s.id, categoryRank[s.statusCategory?.key ?? ''] ?? 1)
     }
   }
+  // Stable sort keeps within-category order as returned by Jira.
+  cols.sort((a, b) => rankById.get(a.statusIds[0])! - rankById.get(b.statusIds[0])!)
   return cols
 }
 
