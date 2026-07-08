@@ -261,9 +261,11 @@ button.primary {
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 160px);
+  /* fixed height so stacked lanes can divide the space equally */
+  height: calc(100vh - 160px);
 }
 .column-header {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   padding: 10px 12px;
@@ -279,18 +281,28 @@ button.primary {
   padding: 0 8px;
 }
 .column-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 0 8px 8px;
-  overflow-y: auto;
-  min-height: 40px;
 }
 
 /* --- lane (status sub-section within a column) --- */
+/* Each lane takes an equal share of the column and scrolls independently. */
+.lane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .lane + .lane {
   margin-top: 6px;
   border-top: 1px solid var(--border);
   padding-top: 6px;
 }
 .lane-label {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -305,7 +317,9 @@ button.primary {
   padding: 0 6px;
 }
 .lane-body {
-  min-height: 24px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   border-radius: var(--radius);
 }
 .lane.over .lane-body {
