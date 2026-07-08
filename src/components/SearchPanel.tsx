@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react'
 import { useSearch } from '../queries'
 
-// SearchPanel is a debounced text search over the current board's project,
-// exercising the /api/search endpoint (JQL under the hood). Results show as a
-// dropdown list; v1 has no detail view.
-export function SearchPanel({ boardId }: { boardId: string }) {
-  const [input, setInput] = useState('')
-  const [q, setQ] = useState('')
+// SearchPanel is a debounced text search over the current board's project. The
+// committed query `q` lives in the URL (passed in); the text box debounces edits
+// back up via onQueryChange so the search is shareable/reload-safe.
+export function SearchPanel({
+  boardId,
+  q,
+  onQueryChange,
+}: {
+  boardId: string
+  q: string
+  onQueryChange: (q: string) => void
+}) {
+  const [input, setInput] = useState(q)
 
+  // Reflect external changes to the URL query (e.g. navigation) into the box.
+  useEffect(() => setInput(q), [q])
+
+  // Debounce edits into the URL (only when actually changed).
   useEffect(() => {
-    const t = setTimeout(() => setQ(input), 300)
+    if (input === q) return
+    const t = setTimeout(() => onQueryChange(input), 300)
     return () => clearTimeout(t)
-  }, [input])
+  }, [input, q, onQueryChange])
 
   const { data: results, isFetching } = useSearch(q, boardId)
   const open = q.trim().length > 0

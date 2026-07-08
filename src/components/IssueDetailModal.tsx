@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Assignee } from '../types'
 import type { InlineSegment } from '../types'
 import {
@@ -72,6 +72,19 @@ export function IssueDetailModal({
     if (!body) return
     addComment.mutate(body, { onSuccess: () => setCommentDraft('') })
   }
+
+  // Escape dismisses the modal — but first backs out of an inline editor if one
+  // is open, so it doesn't discard an in-progress edit unexpectedly.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      if (editingTitle) setEditingTitle(false)
+      else if (editingDesc) setEditingDesc(false)
+      else onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [editingTitle, editingDesc, onClose])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

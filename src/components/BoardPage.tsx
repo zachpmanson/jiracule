@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useParams } from '@tanstack/react-router'
+import { getRouteApi } from '@tanstack/react-router'
 import type { Assignee } from '../types'
 import {
   useBoardColumns,
@@ -16,8 +16,12 @@ import { SearchPanel } from './SearchPanel'
 const ALL = 'all'
 const MINE = 'me'
 
+const routeApi = getRouteApi('/board/$boardId')
+
 export function BoardPage() {
-  const { boardId } = useParams({ from: '/board/$boardId' })
+  const { boardId } = routeApi.useParams()
+  const search = routeApi.useSearch()
+  const navigate = routeApi.useNavigate()
 
   const { data: me } = useMe()
   const { data: boards } = useBoards()
@@ -26,7 +30,13 @@ export function BoardPage() {
   const issuesQ = useBoardIssues(boardId)
   const del = useDeleteIssue(boardId)
 
-  const [assigneeFilter, setAssigneeFilter] = useState<string>(ALL)
+  // Filters live in the URL so they persist across reloads and are shareable.
+  const assigneeFilter = search.assignee ?? ALL
+  const setAssigneeFilter = (value: string) =>
+    navigate({ search: (p) => ({ ...p, assignee: value === ALL ? undefined : value }), replace: true })
+  const setQuery = (q: string) =>
+    navigate({ search: (p) => ({ ...p, q: q || undefined }), replace: true })
+
   const [creating, setCreating] = useState(false)
   const [openIssueKey, setOpenIssueKey] = useState<string | null>(null)
 
@@ -67,7 +77,7 @@ export function BoardPage() {
             </option>
           ))}
         </select>
-        <SearchPanel boardId={boardId} />
+        <SearchPanel boardId={boardId} q={search.q ?? ''} onQueryChange={setQuery} />
         <div className="spacer" />
         {del.isError && <span className="inline-error">{(del.error as Error).message}</span>}
         <button className="primary" onClick={() => setCreating(true)}>
