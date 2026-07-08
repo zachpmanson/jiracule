@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core'
 import type { Column as ColumnType, Issue } from '../types'
 import { useMoveIssue } from '../queries'
+import { errMsg } from '../util'
 import { CardOverlay } from './Card'
 import { Column } from './Column'
 
@@ -63,7 +64,7 @@ export function Board({
   return (
     <>
       {move.isError && (
-        <div className="banner error">Move failed: {(move.error as Error).message}</div>
+        <div className="banner error">Move failed: {errMsg(move.error)}</div>
       )}
       <DndContext
         sensors={sensors}

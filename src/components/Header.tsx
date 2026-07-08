@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useBoards, useMe } from '../queries'
+import { Avatar } from './Avatar'
 
 export function Header() {
   const navigate = useNavigate()
@@ -34,7 +35,7 @@ export function Header() {
       <div className="spacer" />
       {me && (
         <div className="me" title={me.email ?? me.displayName}>
-          {me.avatarUrl && <img src={me.avatarUrl} alt="" className="avatar" />}
+          <Avatar person={me} />
           <span>{me.displayName}</span>
         </div>
       )}

@@ -1,13 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { redirectTo } from '../server/http'
 import {
   accessibleResources,
   exchangeCode,
   getMainSession,
   getOAuthSession,
 } from '../server/session.server'
-
-const redirectTo = (path: string) =>
-  new Response(null, { status: 302, headers: { Location: path } })
 
 // GET /auth/callback — verify state, exchange the code for tokens, resolve the
 // Jira site (cloudId), persist the session, and return to the app.

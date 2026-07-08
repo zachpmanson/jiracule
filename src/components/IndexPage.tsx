@@ -1,11 +1,12 @@
 import { Link } from '@tanstack/react-router'
 import { useBoards } from '../queries'
+import { errMsg } from '../util'
 
 export function IndexPage() {
   const { data: boards, isLoading, error } = useBoards()
 
   if (isLoading) return <div className="placeholder">Loading boards…</div>
-  if (error) return <div className="placeholder error">{(error as Error).message}</div>
+  if (error) return <div className="placeholder error">{errMsg(error)}</div>
 
   return (
     <div className="board-list">

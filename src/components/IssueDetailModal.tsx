@@ -1,31 +1,21 @@
 import { useEffect, useState } from 'react'
-import type { Assignee } from '../types'
 import type { InlineSegment } from '../types'
 import {
   useAddComment,
+  useAssignableUsers,
   useIssueDetail,
   useIssueTransitions,
   useTransitionIssue,
+  useUpdateAssignee,
   useUpdateDescription,
   useUpdateSummary,
 } from '../queries'
+import { Person } from './Avatar'
+import { InlineEditor } from './InlineEditor'
+import { InlineError } from './InlineError'
 import { RichText } from './Linkified'
 
 const segmentsToText = (segments: InlineSegment[]) => segments.map((s) => s.text).join('')
-
-function Person({ person }: { person?: Assignee }) {
-  if (!person) return <span className="muted">Unassigned</span>
-  return (
-    <span className="person">
-      {person.avatarUrl ? (
-        <img src={person.avatarUrl} alt="" className="avatar sm" />
-      ) : (
-        <span className="avatar sm initials">{person.displayName.slice(0, 2).toUpperCase()}</span>
-      )}
-      {person.displayName}
-    </span>
-  )
-}
 
 function fmtDate(iso?: string) {
   if (!iso) return '—'
@@ -44,7 +34,9 @@ export function IssueDetailModal({
 }) {
   const { data: issue, isLoading, error } = useIssueDetail(issueKey)
   const { data: transitions } = useIssueTransitions(issueKey)
+  const { data: assignable } = useAssignableUsers(issueKey)
   const applyTransition = useTransitionIssue(issueKey)
+  const updateAssignee = useUpdateAssignee(issueKey)
   const updateDesc = useUpdateDescription(issueKey)
   const updateSummary = useUpdateSummary(issueKey)
   const addComment = useAddComment(issueKey)
@@ -99,32 +91,6 @@ export function IssueDetailModal({
               <img src={issue.issueTypeIconUrl} alt="" className="type-icon" />
             )}
             <span className="card-key">{issueKey}</span>
-            {issue &&
-              (transitions && transitions.length > 0 ? (
-                <select
-                  className="status-select"
-                  value=""
-                  disabled={applyTransition.isPending}
-                  onChange={(e) => {
-                    if (e.target.value) applyTransition.mutate(e.target.value)
-                  }}
-                  title="Change status"
-                >
-                  <option value="">
-                    {applyTransition.isPending ? 'Updating…' : issue.statusName}
-                  </option>
-                  {transitions.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.toStatusName ?? t.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className="status-badge">{issue.statusName}</span>
-              ))}
-            {applyTransition.isError && (
-              <span className="inline-error">{(applyTransition.error as Error).message}</span>
-            )}
           </div>
           <button className="icon-btn" title="Close" onClick={onClose}>
             ×
@@ -132,32 +98,21 @@ export function IssueDetailModal({
         </div>
 
         {isLoading && <div className="placeholder">Loading…</div>}
-        {error && <div className="inline-error">{(error as Error).message}</div>}
+        <InlineError error={error} />
 
         {issue && (
           <>
             {editingTitle ? (
-              <div className="editor">
-                <textarea
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  rows={2}
-                  autoFocus
-                />
-                {updateSummary.isError && (
-                  <div className="inline-error">{(updateSummary.error as Error).message}</div>
-                )}
-                <div className="editor-actions">
-                  <button onClick={() => setEditingTitle(false)}>Cancel</button>
-                  <button
-                    className="primary"
-                    onClick={saveTitle}
-                    disabled={updateSummary.isPending || !titleDraft.trim()}
-                  >
-                    {updateSummary.isPending ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </div>
+              <InlineEditor
+                value={titleDraft}
+                onChange={setTitleDraft}
+                onSave={saveTitle}
+                onCancel={() => setEditingTitle(false)}
+                pending={updateSummary.isPending}
+                error={updateSummary.error}
+                requireNonEmpty
+                autoFocus
+              />
             ) : (
               <h2 className="detail-title">
                 <span>{issue.summary}</span>
@@ -167,110 +122,150 @@ export function IssueDetailModal({
               </h2>
             )}
 
-            <dl className="detail-grid">
-              <dt>Assignee</dt>
-              <dd>
-                <Person person={issue.assignee} />
-              </dd>
-              <dt>Reporter</dt>
-              <dd>
-                <Person person={issue.reporter} />
-              </dd>
-              <dt>Type</dt>
-              <dd>{issue.issueType ?? '—'}</dd>
-              <dt>Priority</dt>
-              <dd>{issue.priority ?? '—'}</dd>
-              <dt>Labels</dt>
-              <dd>
-                {issue.labels.length ? (
-                  <span className="labels">
-                    {issue.labels.map((l) => (
-                      <span key={l} className="label-chip">
-                        {l}
-                      </span>
-                    ))}
-                  </span>
-                ) : (
-                  '—'
-                )}
-              </dd>
-              <dt>Created</dt>
-              <dd>{fmtDate(issue.created)}</dd>
-              <dt>Updated</dt>
-              <dd>{fmtDate(issue.updated)}</dd>
-            </dl>
-
-            <div className="section-label">
-              Description
-              {!editingDesc && (
-                <button className="link-btn" onClick={startEdit}>
-                  Edit
-                </button>
-              )}
-            </div>
-            {editingDesc ? (
-              <div className="editor">
-                <textarea
-                  value={descDraft}
-                  onChange={(e) => setDescDraft(e.target.value)}
-                  rows={6}
-                  autoFocus
-                />
-                {updateDesc.isError && (
-                  <div className="inline-error">{(updateDesc.error as Error).message}</div>
-                )}
-                <div className="editor-actions">
-                  <button onClick={() => setEditingDesc(false)}>Cancel</button>
-                  <button className="primary" onClick={saveDesc} disabled={updateDesc.isPending}>
-                    {updateDesc.isPending ? 'Saving…' : 'Save'}
-                  </button>
+            <div className="detail-body">
+              <div className="detail-main">
+                <div className="section-label">
+                  Description
+                  {!editingDesc && (
+                    <button className="link-btn" onClick={startEdit}>
+                      Edit
+                    </button>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div className="detail-desc">
-                {issue.description.length ? (
-                  <RichText segments={issue.description} />
+                {editingDesc ? (
+                  <InlineEditor
+                    value={descDraft}
+                    onChange={setDescDraft}
+                    onSave={saveDesc}
+                    onCancel={() => setEditingDesc(false)}
+                    pending={updateDesc.isPending}
+                    error={updateDesc.error}
+                    rows={6}
+                    autoFocus
+                  />
                 ) : (
-                  <span className="muted">No description</span>
+                  <div className="detail-desc">
+                    {issue.description.length ? (
+                      <RichText segments={issue.description} />
+                    ) : (
+                      <span className="muted">No description</span>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
 
-            <div className="section-label">Comments ({issue.comments.length})</div>
-            {issue.comments.length > 0 && (
-              <ul className="comments">
-                {issue.comments.map((c) => (
-                  <li key={c.id} className="comment">
-                    <div className="comment-head">
-                      <Person person={c.author} />
-                      <span className="muted">{fmtDate(c.updated ?? c.created)}</span>
-                    </div>
-                    <div className="comment-body">
-                      <RichText segments={c.body} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="editor comment-composer">
-              <textarea
-                value={commentDraft}
-                onChange={(e) => setCommentDraft(e.target.value)}
-                placeholder="Add a comment…"
-                rows={2}
-              />
-              {addComment.isError && (
-                <div className="inline-error">{(addComment.error as Error).message}</div>
-              )}
-              <div className="editor-actions">
-                <button
-                  className="primary"
-                  onClick={submitComment}
-                  disabled={addComment.isPending || !commentDraft.trim()}
-                >
-                  {addComment.isPending ? 'Adding…' : 'Comment'}
-                </button>
+                <div className="section-label">Comments ({issue.comments.length})</div>
+                {issue.comments.length > 0 && (
+                  <ul className="comments">
+                    {issue.comments.map((c) => (
+                      <li key={c.id} className="comment">
+                        <div className="comment-head">
+                          <Person person={c.author} />
+                          <span className="muted">{fmtDate(c.updated ?? c.created)}</span>
+                        </div>
+                        <div className="comment-body">
+                          <RichText segments={c.body} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <InlineEditor
+                  className="comment-composer"
+                  value={commentDraft}
+                  onChange={setCommentDraft}
+                  onSave={submitComment}
+                  pending={addComment.isPending}
+                  error={addComment.error}
+                  placeholder="Add a comment…"
+                  saveLabel="Comment"
+                  savingLabel="Adding…"
+                  requireNonEmpty
+                />
               </div>
+
+              <aside className="detail-side">
+                <dl className="detail-grid">
+                  <dt>Status</dt>
+                  <dd>
+                    {transitions && transitions.length > 0 ? (
+                      <select
+                        className="status-select"
+                        value=""
+                        disabled={applyTransition.isPending}
+                        onChange={(e) => {
+                          if (e.target.value) applyTransition.mutate(e.target.value)
+                        }}
+                        title="Change status"
+                      >
+                        <option value="">
+                          {applyTransition.isPending ? 'Updating…' : issue.statusName}
+                        </option>
+                        {transitions.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.toStatusName ?? t.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="status-badge">{issue.statusName}</span>
+                    )}
+                    <InlineError error={applyTransition.error} />
+                  </dd>
+                  <dt>Assignee</dt>
+                  <dd>
+                    <select
+                      className="assignee-select"
+                      value={issue.assignee?.accountId ?? ''}
+                      disabled={updateAssignee.isPending}
+                      onChange={(e) => updateAssignee.mutate(e.target.value || null)}
+                    >
+                      <option value="">Unassigned</option>
+                      {/* Keep the current assignee selectable even if the assignable
+                          list hasn't loaded or doesn't include them. */}
+                      {issue.assignee &&
+                        !(assignable ?? []).some(
+                          (u) => u.accountId === issue.assignee!.accountId,
+                        ) && (
+                          <option value={issue.assignee.accountId}>
+                            {issue.assignee.displayName}
+                          </option>
+                        )}
+                      {(assignable ?? []).map((u) => (
+                        <option key={u.accountId} value={u.accountId}>
+                          {u.displayName}
+                        </option>
+                      ))}
+                    </select>
+                    <InlineError error={updateAssignee.error} />
+                  </dd>
+                  <dt>Reporter</dt>
+                  <dd>
+                    <Person person={issue.reporter} />
+                  </dd>
+                  <dt>Type</dt>
+                  <dd>{issue.issueType ?? '—'}</dd>
+                  <dt>Priority</dt>
+                  <dd>{issue.priority ?? '—'}</dd>
+                  <dt>Labels</dt>
+                  <dd>
+                    {issue.labels.length ? (
+                      <span className="labels">
+                        {issue.labels.map((l) => (
+                          <span key={l} className="label-chip">
+                            {l}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                  <dt>Created</dt>
+                  <dd>{fmtDate(issue.created)}</dd>
+                  <dt>Updated</dt>
+                  <dd>{fmtDate(issue.updated)}</dd>
+                </dl>
+              </aside>
             </div>
 
             <div className="modal-actions">

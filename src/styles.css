@@ -214,9 +214,33 @@ button.primary {
 
 .search {
   position: relative;
+  flex: 1; /* grow to fill the toolbar */
 }
-.search input {
-  width: 240px;
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-box input[type='search'] {
+  flex: 1;
+  min-width: 0;
+}
+.jql-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.jql-toggle input {
+  cursor: pointer;
+}
+.search-item.error {
+  color: var(--danger);
+  white-space: normal;
 }
 .search-results {
   position: absolute;
@@ -239,6 +263,20 @@ button.primary {
   align-items: baseline;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
+}
+button.search-item {
+  width: 100%;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-radius: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+button.search-item:hover {
+  background: var(--col-bg);
 }
 .search-summary {
   flex: 1;
@@ -266,7 +304,7 @@ button.primary {
   display: flex;
   flex-direction: column;
   /* fixed height so stacked lanes can divide the space equally */
-  height: calc(100vh - 160px);
+  height: calc(100vh - 128px);
 }
 .column-header {
   flex: 0 0 auto;
@@ -495,20 +533,50 @@ button.primary {
 .detail-title span {
   overflow-wrap: anywhere;
 }
+/* Two-column body: description + comments on the left, metadata on the right. */
+.detail-body {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0; /* let the columns scroll internally rather than grow the modal */
+}
+.detail-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.detail-side {
+  flex: 0 0 240px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  padding-left: 16px;
+}
+
+/* Metadata stacks label-over-value so it stays compact in the narrow sidebar. */
 .detail-grid {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 6px 12px;
-  margin: 0 0 14px;
+  margin: 0;
 }
 .detail-grid dt {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  align-self: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 12px;
+}
+.detail-grid dt:first-child {
+  margin-top: 0;
 }
 .detail-grid dd {
-  margin: 0;
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+.assignee-select,
+.detail-side .status-select {
+  max-width: 100%;
+  width: 100%;
 }
 .person {
   display: inline-flex;
@@ -570,8 +638,6 @@ button.link-btn {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px;
-  max-height: 40vh;
-  overflow: auto;
   font-size: 13px;
 }
 .comments {
@@ -581,9 +647,6 @@ button.link-btn {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex: 1;
-  min-height: 0; /* allow the list to shrink and scroll inside the flex column */
-  overflow: auto;
 }
 .comment {
   border: 1px solid var(--border);

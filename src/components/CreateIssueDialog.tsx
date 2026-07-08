@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Assignee } from '../types'
 import { useCreateIssue } from '../queries'
+import { InlineError } from './InlineError'
 
 export function CreateIssueDialog({
   boardId,
@@ -66,7 +67,7 @@ export function CreateIssueDialog({
             ))}
           </select>
         </label>
-        {create.isError && <div className="inline-error">{(create.error as Error).message}</div>}
+        <InlineError error={create.error} />
         <div className="modal-actions">
           <button type="button" onClick={onClose}>
             Cancel

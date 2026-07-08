@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { redirectTo } from '../server/http'
 import { getMainSession } from '../server/session.server'
 
 // POST /auth/logout — clear the session cookie and return to the app.
@@ -8,7 +9,7 @@ export const Route = createFileRoute('/auth/logout')({
       POST: async () => {
         const session = await getMainSession()
         await session.clear()
-        return new Response(null, { status: 302, headers: { Location: '/' } })
+        return redirectTo('/')
       },
     },
   },

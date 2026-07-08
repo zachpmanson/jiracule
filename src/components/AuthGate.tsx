@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { NOT_AUTHENTICATED } from '../auth-constants'
 import { useMe } from '../queries'
+import { errMsg } from '../util'
 
 const AUTH_ERRORS: Record<string, string> = {
   state: 'Login could not be verified. Please try again.',
@@ -32,7 +33,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const me = useMe()
   if (me.isLoading) return <div className="placeholder">Loading…</div>
   if (me.error) {
-    const msg = (me.error as Error).message
+    const msg = errMsg(me.error)
     if (msg === NOT_AUTHENTICATED) return <ConnectScreen />
     return <div className="placeholder error">{msg}</div>
   }

@@ -10,8 +10,10 @@ import {
 } from '../queries'
 import { Board } from './Board'
 import { CreateIssueDialog } from './CreateIssueDialog'
+import { InlineError } from './InlineError'
 import { IssueDetailModal } from './IssueDetailModal'
 import { SearchPanel } from './SearchPanel'
+import { errMsg } from '../util'
 
 const ALL = 'all'
 const MINE = 'me'
@@ -36,6 +38,9 @@ export function BoardPage() {
     navigate({ search: (p) => ({ ...p, assignee: value === ALL ? undefined : value }), replace: true })
   const setQuery = (q: string) =>
     navigate({ search: (p) => ({ ...p, q: q || undefined }), replace: true })
+  const jqlMode = search.jql ?? false
+  const setJqlMode = (on: boolean) =>
+    navigate({ search: (p) => ({ ...p, jql: on || undefined }), replace: true })
 
   const [creating, setCreating] = useState(false)
   const [openIssueKey, setOpenIssueKey] = useState<string | null>(null)
@@ -63,7 +68,7 @@ export function BoardPage() {
   if (columnsQ.isLoading || issuesQ.isLoading)
     return <div className="placeholder">Loading board…</div>
   const err = columnsQ.error ?? issuesQ.error
-  if (err) return <div className="placeholder error">{(err as Error).message}</div>
+  if (err) return <div className="placeholder error">{errMsg(err)}</div>
 
   return (
     <div className="board-page">
@@ -77,9 +82,15 @@ export function BoardPage() {
             </option>
           ))}
         </select>
-        <SearchPanel boardId={boardId} q={search.q ?? ''} onQueryChange={setQuery} />
-        <div className="spacer" />
-        {del.isError && <span className="inline-error">{(del.error as Error).message}</span>}
+        <SearchPanel
+          boardId={boardId}
+          q={search.q ?? ''}
+          jql={jqlMode}
+          onQueryChange={setQuery}
+          onJqlChange={setJqlMode}
+          onOpen={setOpenIssueKey}
+        />
+        <InlineError error={del.error} />
         <button className="primary" onClick={() => setCreating(true)}>
           + New
         </button>

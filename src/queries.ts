@@ -4,6 +4,7 @@ import {
   addIssueComment,
   createIssue,
   deleteIssue,
+  getAssignableUsers,
   getBoardColumns,
   getBoardIssues,
   getBoards,
@@ -13,6 +14,7 @@ import {
   moveIssue,
   searchIssues,
   transitionIssue,
+  updateIssueAssignee,
   updateIssueDescription,
   updateIssueSummary,
 } from './server/jira.functions'
@@ -23,7 +25,17 @@ export const keys = {
   columns: (boardId: string) => ['boards', boardId, 'columns'] as const,
   issues: (boardId: string) => ['boards', boardId, 'issues'] as const,
   issue: (issueKey: string) => ['issue', issueKey] as const,
-  search: (q: string, boardId?: string) => ['search', q, boardId] as const,
+  assignable: (issueKey: string) => ['issue', issueKey, 'assignable'] as const,
+  transitions: (issueKey: string) => ['issue', issueKey, 'transitions'] as const,
+  search: (q: string, boardId?: string, jql?: boolean) => ['search', q, boardId, jql] as const,
+}
+
+// Refresh a single issue's detail plus every board (a mutated field — summary,
+// assignee, status — also shows on board cards). Shared by the field-editing
+// mutations below so their invalidation can't drift apart.
+function invalidateIssueAndBoards(qc: ReturnType<typeof useQueryClient>, issueKey: string) {
+  qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
+  qc.invalidateQueries({ queryKey: keys.boards })
 }
 
 export function useIssueDetail(issueKey: string | null) {
@@ -47,11 +59,27 @@ export function useUpdateSummary(issueKey: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (summary: string) => updateIssueSummary({ data: { issueKey, summary } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
-      // The summary shows on board cards too, so refresh board data.
-      qc.invalidateQueries({ queryKey: ['boards'] })
-    },
+    onSuccess: () => invalidateIssueAndBoards(qc, issueKey),
+  })
+}
+
+export function useAssignableUsers(issueKey: string | null) {
+  return useQuery({
+    queryKey: keys.assignable(issueKey ?? ''),
+    queryFn: () => getAssignableUsers({ data: { issueKey: issueKey! } }),
+    enabled: !!issueKey,
+    staleTime: 5 * 60_000,
+  })
+}
+
+// Reassigns the issue, then refreshes the issue and the board (assignee shows on
+// cards and drives the assignee filter).
+export function useUpdateAssignee(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (accountId: string | null) =>
+      updateIssueAssignee({ data: { issueKey, accountId } }),
+    onSuccess: () => invalidateIssueAndBoards(qc, issueKey),
   })
 }
 
@@ -65,7 +93,7 @@ export function useAddComment(issueKey: string) {
 
 export function useIssueTransitions(issueKey: string | null) {
   return useQuery({
-    queryKey: ['issue', issueKey ?? '', 'transitions'],
+    queryKey: keys.transitions(issueKey ?? ''),
     queryFn: () => getIssueTransitions({ data: { issueKey: issueKey! } }),
     enabled: !!issueKey,
   })
@@ -78,9 +106,8 @@ export function useTransitionIssue(issueKey: string) {
   return useMutation({
     mutationFn: (transitionId: string) => transitionIssue({ data: { issueKey, transitionId } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
-      qc.invalidateQueries({ queryKey: ['issue', issueKey, 'transitions'] })
-      qc.invalidateQueries({ queryKey: ['boards'] })
+      qc.invalidateQueries({ queryKey: keys.transitions(issueKey) })
+      invalidateIssueAndBoards(qc, issueKey)
     },
   })
 }
@@ -151,10 +178,12 @@ export function useMoveIssue(boardId: string) {
   })
 }
 
-export function useSearch(q: string, boardId?: string) {
+export function useSearch(q: string, boardId?: string, jql?: boolean) {
   return useQuery({
-    queryKey: keys.search(q, boardId),
-    queryFn: () => searchIssues({ data: { q, boardId } }),
+    queryKey: keys.search(q, boardId, jql),
+    queryFn: () => searchIssues({ data: { q, boardId, jql } }),
     enabled: q.trim().length > 0,
+    // JQL is easy to get wrong; don't hammer Jira with retries on a 400.
+    retry: false,
   })
 }

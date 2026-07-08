@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import type { Issue } from '../types'
+import { Avatar } from './Avatar'
 
 // Shared visual content for both the in-column card and the drag overlay.
 function CardInner({ issue }: { issue: Issue }) {
@@ -11,19 +12,7 @@ function CardInner({ issue }: { issue: Issue }) {
         <span className="card-key">{issue.key}</span>
         {issue.priority && <span className="priority">{issue.priority}</span>}
         <div className="spacer" />
-        {issue.assignee &&
-          (issue.assignee.avatarUrl ? (
-            <img
-              src={issue.assignee.avatarUrl}
-              alt={issue.assignee.displayName}
-              title={issue.assignee.displayName}
-              className="avatar sm"
-            />
-          ) : (
-            <span className="avatar sm initials" title={issue.assignee.displayName}>
-              {issue.assignee.displayName.slice(0, 2).toUpperCase()}
-            </span>
-          ))}
+        {issue.assignee && <Avatar person={issue.assignee} size="sm" />}
       </div>
     </>
   )

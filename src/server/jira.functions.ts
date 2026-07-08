@@ -54,6 +54,19 @@ export const updateIssueSummary = createServerFn({ method: 'POST' })
   .validator((d: { issueKey: string; summary: string }) => d)
   .handler(({ data, context }) => jira.updateIssueSummary(context.jira, data.issueKey, data.summary))
 
+export const getAssignableUsers = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string }) => d)
+  .handler(({ data, context }) => jira.assignableUsers(context.jira, data.issueKey))
+
+export const updateIssueAssignee = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string; accountId: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    await jira.updateIssueAssignee(context.jira, data.issueKey, data.accountId)
+    return jira.getIssue(context.jira, data.issueKey)
+  })
+
 export const addIssueComment = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator((d: { issueKey: string; body: string }) => d)
@@ -79,10 +92,13 @@ export const transitionIssue = createServerFn({ method: 'POST' })
 
 export const searchIssues = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
-  .validator((d: { q: string; boardId?: string }) => d)
+  .validator((d: { q: string; boardId?: string; jql?: boolean }) => d)
   .handler(async ({ data, context }) => {
     const q = data.q.trim()
     if (!q) return []
+    // JQL mode: the input is a complete query the user controls, so pass it
+    // through verbatim (no project scoping, no summary wrapping).
+    if (data.jql) return jira.search(context.jira, q)
     const clauses: string[] = []
     if (data.boardId != null) {
       const boards = await jira.listBoards(context.jira)

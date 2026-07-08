@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createHash, randomBytes } from 'node:crypto'
+import { redirectTo } from '../server/http'
 import { getOAuthSession, oauthConfig, SCOPES } from '../server/session.server'
 
 const base64url = (b: Buffer) =>
@@ -30,7 +31,7 @@ export const Route = createFileRoute('/auth/login')({
         url.searchParams.set('code_challenge', challenge)
         url.searchParams.set('code_challenge_method', 'S256')
 
-        return new Response(null, { status: 302, headers: { Location: url.toString() } })
+        return redirectTo(url.toString())
       },
     },
   },

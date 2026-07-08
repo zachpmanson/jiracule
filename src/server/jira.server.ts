@@ -408,6 +408,27 @@ export async function updateIssueSummary(
   })
 }
 
+export async function updateIssueAssignee(
+  auth: JiraAuth,
+  issueKey: string,
+  accountId: string | null,
+): Promise<void> {
+  await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    fields: { assignee: accountId ? { accountId } : null },
+  })
+}
+
+// assignableUsers lists the people who can be assigned to a given issue (scoped
+// to the issue's project by Jira). Used to populate the reassign dropdown.
+export async function assignableUsers(auth: JiraAuth, issueKey: string): Promise<Assignee[]> {
+  const r = await jiraFetch<RawPerson[]>(
+    auth,
+    'GET',
+    `/rest/api/3/user/assignable/search?issueKey=${encodeURIComponent(issueKey)}&maxResults=100`,
+  )
+  return (r ?? []).map((p) => toAssignee(p)!).filter(Boolean)
+}
+
 export async function addComment(auth: JiraAuth, issueKey: string, body: string): Promise<void> {
   await jiraFetch(auth, 'POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
     body: adfDoc(body),

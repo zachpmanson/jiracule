@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useSearch } from '../queries'
+import { errMsg } from '../util'
 
-// SearchPanel is a debounced text search over the current board's project. The
-// committed query `q` lives in the URL (passed in); the text box debounces edits
-// back up via onQueryChange so the search is shareable/reload-safe.
+// SearchPanel is a debounced search over the current board's project. In the
+// default mode it matches issue summaries; with the JQL toggle on, the input is
+// sent to Jira as a raw JQL query. The committed query `q` and the `jql` flag
+// both live in the URL (passed in) so searches are shareable/reload-safe.
 export function SearchPanel({
   boardId,
   q,
+  jql,
   onQueryChange,
+  onJqlChange,
+  onOpen,
 }: {
   boardId: string
   q: string
+  jql: boolean
   onQueryChange: (q: string) => void
+  onJqlChange: (jql: boolean) => void
+  onOpen: (issueKey: string) => void
 }) {
   const [input, setInput] = useState(q)
 
@@ -25,29 +33,43 @@ export function SearchPanel({
     return () => clearTimeout(t)
   }, [input, q, onQueryChange])
 
-  const { data: results, isFetching } = useSearch(q, boardId)
+  const { data: results, isFetching, error } = useSearch(q, boardId, jql)
   const open = q.trim().length > 0
 
   return (
     <div className="search">
-      <input
-        type="search"
-        placeholder="Search issues…"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
+      <div className="search-box">
+        <input
+          type="search"
+          placeholder={jql ? 'JQL, e.g. status = "In Progress" ORDER BY updated DESC' : 'Search issues…'}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <label className="jql-toggle" title="Treat the query as raw JQL">
+          <input type="checkbox" checked={jql} onChange={(e) => onJqlChange(e.target.checked)} />
+          JQL
+        </label>
+      </div>
       {open && (
         <div className="search-results">
           {isFetching && <div className="search-item muted">Searching…</div>}
-          {!isFetching && results?.length === 0 && (
+          {!isFetching && error && (
+            <div className="search-item error">{errMsg(error)}</div>
+          )}
+          {!isFetching && !error && results?.length === 0 && (
             <div className="search-item muted">No matches</div>
           )}
           {results?.map((i) => (
-            <div key={i.key} className="search-item">
+            <button
+              key={i.key}
+              type="button"
+              className="search-item"
+              onClick={() => onOpen(i.key)}
+            >
               <span className="card-key">{i.key}</span>
               <span className="search-summary">{i.summary}</span>
               <span className="muted">{i.statusName}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
