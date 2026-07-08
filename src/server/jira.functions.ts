@@ -64,6 +64,19 @@ export const moveIssue = createServerFn({ method: 'POST' })
   .validator((d: { issueKey: string; targetStatusId: string }) => d)
   .handler(({ data, context }) => jira.moveIssue(context.jira, data.issueKey, data.targetStatusId))
 
+export const getIssueTransitions = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string }) => d)
+  .handler(({ data, context }) => jira.transitions(context.jira, data.issueKey))
+
+export const transitionIssue = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string; transitionId: string }) => d)
+  .handler(async ({ data, context }) => {
+    await jira.doTransition(context.jira, data.issueKey, data.transitionId)
+    return jira.getIssue(context.jira, data.issueKey)
+  })
+
 export const searchIssues = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .validator((d: { q: string; boardId?: string }) => d)

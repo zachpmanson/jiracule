@@ -4,6 +4,8 @@ import type { InlineSegment } from '../types'
 import {
   useAddComment,
   useIssueDetail,
+  useIssueTransitions,
+  useTransitionIssue,
   useUpdateDescription,
   useUpdateSummary,
 } from '../queries'
@@ -41,6 +43,8 @@ export function IssueDetailModal({
   onDelete: (key: string) => void
 }) {
   const { data: issue, isLoading, error } = useIssueDetail(issueKey)
+  const { data: transitions } = useIssueTransitions(issueKey)
+  const applyTransition = useTransitionIssue(issueKey)
   const updateDesc = useUpdateDescription(issueKey)
   const updateSummary = useUpdateSummary(issueKey)
   const addComment = useAddComment(issueKey)
@@ -95,7 +99,32 @@ export function IssueDetailModal({
               <img src={issue.issueTypeIconUrl} alt="" className="type-icon" />
             )}
             <span className="card-key">{issueKey}</span>
-            {issue?.statusName && <span className="status-badge">{issue.statusName}</span>}
+            {issue &&
+              (transitions && transitions.length > 0 ? (
+                <select
+                  className="status-select"
+                  value=""
+                  disabled={applyTransition.isPending}
+                  onChange={(e) => {
+                    if (e.target.value) applyTransition.mutate(e.target.value)
+                  }}
+                  title="Change status"
+                >
+                  <option value="">
+                    {applyTransition.isPending ? 'Updating…' : issue.statusName} ▾
+                  </option>
+                  {transitions.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.toStatusName ?? t.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="status-badge">{issue.statusName}</span>
+              ))}
+            {applyTransition.isError && (
+              <span className="inline-error">{(applyTransition.error as Error).message}</span>
+            )}
           </div>
           <button className="icon-btn" title="Close" onClick={onClose}>
             ×

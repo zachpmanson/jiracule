@@ -8,9 +8,11 @@ import {
   getBoardIssues,
   getBoards,
   getIssueDetail,
+  getIssueTransitions,
   getMe,
   moveIssue,
   searchIssues,
+  transitionIssue,
   updateIssueDescription,
   updateIssueSummary,
 } from './server/jira.functions'
@@ -58,6 +60,28 @@ export function useAddComment(issueKey: string) {
   return useMutation({
     mutationFn: (body: string) => addIssueComment({ data: { issueKey, body } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(issueKey) }),
+  })
+}
+
+export function useIssueTransitions(issueKey: string | null) {
+  return useQuery({
+    queryKey: ['issue', issueKey ?? '', 'transitions'],
+    queryFn: () => getIssueTransitions({ data: { issueKey: issueKey! } }),
+    enabled: !!issueKey,
+  })
+}
+
+// Applies a specific workflow transition, then refreshes the issue and the
+// board (status shows on cards too).
+export function useTransitionIssue(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (transitionId: string) => transitionIssue({ data: { issueKey, transitionId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
+      qc.invalidateQueries({ queryKey: ['issue', issueKey, 'transitions'] })
+      qc.invalidateQueries({ queryKey: ['boards'] })
+    },
   })
 }
 

@@ -76,7 +76,11 @@ export function Board({
             <Column key={c.name} column={c} issues={byColumn[i]} onDelete={onDelete} onOpen={onOpen} />
           ))}
         </div>
-        <DragOverlay>{activeIssue ? <CardOverlay issue={activeIssue} /> : null}</DragOverlay>
+        {/* No drop animation: the card shouldn't fly back to its origin — the
+            optimistic move drops it straight into the target lane. */}
+        <DragOverlay dropAnimation={null}>
+          {activeIssue ? <CardOverlay issue={activeIssue} /> : null}
+        </DragOverlay>
       </DndContext>
     </>
   )
