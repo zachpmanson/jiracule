@@ -337,8 +337,16 @@ button.primary {
   margin-bottom: 8px;
   cursor: grab;
 }
-.card.dragging {
-  opacity: 0.6;
+.card.dragging-source {
+  opacity: 0.4;
+}
+/* Rendered in the DragOverlay (portaled to <body>), so it needs an explicit
+   width and floats above the columns without being clipped by their scroll. */
+.card-overlay {
+  width: 256px;
+  cursor: grabbing;
+  box-shadow: 0 8px 20px rgba(9, 30, 66, 0.35);
+  margin: 0;
 }
 .card-summary {
   margin-bottom: 8px;

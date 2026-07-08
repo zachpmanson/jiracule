@@ -1,12 +1,16 @@
+import { useState } from 'react'
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import type { Column as ColumnType, Issue } from '../types'
 import { useMoveIssue } from '../queries'
+import { CardOverlay } from './Card'
 import { Column } from './Column'
 
 export function Board({
@@ -23,6 +27,8 @@ export function Board({
   onOpen: (key: string) => void
 }) {
   const move = useMoveIssue(boardId)
+  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const activeIssue = activeKey ? (issues.find((i) => i.key === activeKey) ?? null) : null
 
   // A small activation distance so clicking a card / its delete button doesn't
   // start a drag.
@@ -40,7 +46,12 @@ export function Board({
 
   // A drop target's id is the destination status id (a lane). Dropping moves the
   // issue to that status via a workflow transition.
+  function onDragStart(e: DragStartEvent) {
+    setActiveKey(String(e.active.id))
+  }
+
   function onDragEnd(e: DragEndEvent) {
+    setActiveKey(null)
     const key = String(e.active.id)
     const targetStatusId = e.over ? String(e.over.id) : null
     if (!targetStatusId) return
@@ -54,12 +65,18 @@ export function Board({
       {move.isError && (
         <div className="banner error">Move failed: {(move.error as Error).message}</div>
       )}
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setActiveKey(null)}
+      >
         <div className="board">
           {columns.map((c, i) => (
             <Column key={c.name} column={c} issues={byColumn[i]} onDelete={onDelete} onOpen={onOpen} />
           ))}
         </div>
+        <DragOverlay>{activeIssue ? <CardOverlay issue={activeIssue} /> : null}</DragOverlay>
       </DndContext>
     </>
   )
