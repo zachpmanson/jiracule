@@ -219,6 +219,19 @@ function prependToLane(data: LaneData | undefined, issue: Issue): LaneData | und
   }
 }
 
+// How long to wait after a transition before refetching the affected lanes.
+// Jira's /search/jql index is eventually consistent; refetching sooner re-reads
+// the issue under its pre-transition status and undoes the optimistic move.
+const RECONCILE_DELAY_MS = 2500
+
+// Invalidate the source lane (and target, when distinct) so they refetch and
+// realign with Jira. Shared by the move mutation's success/error paths.
+function reconcile(qc: ReturnType<typeof useQueryClient>, sourceKey: QueryKey, targetKey: QueryKey) {
+  qc.invalidateQueries({ queryKey: sourceKey })
+  if (JSON.stringify(sourceKey) !== JSON.stringify(targetKey))
+    qc.invalidateQueries({ queryKey: targetKey })
+}
+
 // Optimistically moves the card from its source lane into the target lane (or
 // just flips its status within a pooled lane), rolling back both caches if the
 // workflow rejects the transition, then reconciles with a refetch.
@@ -257,12 +270,16 @@ export function useMoveIssue() {
       if (!ctx) return
       if (ctx.prevSource) qc.setQueryData(ctx.sourceKey, ctx.prevSource)
       if (ctx.prevTarget) qc.setQueryData(ctx.targetKey, ctx.prevTarget)
+      // A failed move: reconcile immediately so the rolled-back caches match Jira.
+      reconcile(qc, ctx.sourceKey, ctx.targetKey)
     },
-    onSettled: (_data, _err, _vars, ctx) => {
-      if (!ctx) return
-      qc.invalidateQueries({ queryKey: ctx.sourceKey })
-      if (JSON.stringify(ctx.sourceKey) !== JSON.stringify(ctx.targetKey))
-        qc.invalidateQueries({ queryKey: ctx.targetKey })
+    onSuccess: (_data, _vars, ctx) => {
+      // The optimistic caches already reflect the move. Jira's /search/jql index
+      // is eventually consistent and lags a transition by up to a few seconds, so
+      // refetching *now* would re-read the issue under its old status and snap the
+      // card back into the source lane. Wait for the index to catch up, then
+      // reconcile (ordering, totals, any status Jira routed the transition to).
+      setTimeout(() => reconcile(qc, ctx.sourceKey, ctx.targetKey), RECONCILE_DELAY_MS)
     },
   })
 }
