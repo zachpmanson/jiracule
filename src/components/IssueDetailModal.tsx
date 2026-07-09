@@ -5,9 +5,11 @@ import {
   useAssignableUsers,
   useIssueDetail,
   useIssueTransitions,
+  useSearch,
   useTransitionIssue,
   useUpdateAssignee,
   useUpdateDescription,
+  useUpdateParent,
   useUpdateSummary,
 } from '../queries'
 import { Person } from './Avatar'
@@ -25,12 +27,16 @@ function fmtDate(iso?: string) {
 
 export function IssueDetailModal({
   issueKey,
+  boardId,
   onClose,
   onDelete,
+  onOpen,
 }: {
   issueKey: string
+  boardId?: string
   onClose: () => void
   onDelete: (key: string) => void
+  onOpen?: (key: string) => void
 }) {
   const { data: issue, isLoading, error } = useIssueDetail(issueKey)
   const { data: transitions } = useIssueTransitions(issueKey)
@@ -39,6 +45,7 @@ export function IssueDetailModal({
   const updateAssignee = useUpdateAssignee(issueKey)
   const updateDesc = useUpdateDescription(issueKey)
   const updateSummary = useUpdateSummary(issueKey)
+  const updateParent = useUpdateParent(issueKey)
   const addComment = useAddComment(issueKey)
 
   const [editingDesc, setEditingDesc] = useState(false)
@@ -46,6 +53,7 @@ export function IssueDetailModal({
   const [commentDraft, setCommentDraft] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+  const [editingParent, setEditingParent] = useState(false)
 
   function startEditTitle() {
     setTitleDraft(issue?.summary ?? '')
@@ -76,11 +84,12 @@ export function IssueDetailModal({
       if (e.key !== 'Escape') return
       if (editingTitle) setEditingTitle(false)
       else if (editingDesc) setEditingDesc(false)
+      else if (editingParent) setEditingParent(false)
       else onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [editingTitle, editingDesc, onClose])
+  }, [editingTitle, editingDesc, editingParent, onClose])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -238,6 +247,49 @@ export function IssueDetailModal({
                     </select>
                     <InlineError error={updateAssignee.error} />
                   </dd>
+                  <dt>Parent</dt>
+                  <dd>
+                    {editingParent ? (
+                      <ParentPicker
+                        boardId={boardId}
+                        pending={updateParent.isPending}
+                        error={updateParent.error}
+                        hasParent={!!issue.parent}
+                        onSelect={(key) =>
+                          updateParent.mutate(key, {
+                            onSuccess: () => setEditingParent(false),
+                          })
+                        }
+                        onClear={() =>
+                          updateParent.mutate(null, {
+                            onSuccess: () => setEditingParent(false),
+                          })
+                        }
+                        onCancel={() => setEditingParent(false)}
+                      />
+                    ) : (
+                      <div className="parent-row">
+                        {issue.parent ? (
+                          <button
+                            type="button"
+                            className="parent-chip"
+                            onClick={() => onOpen?.(issue.parent!.key)}
+                            title={issue.parent.summary ?? issue.parent.key}
+                          >
+                            <span className="card-key">{issue.parent.key}</span>
+                            {issue.parent.summary && (
+                              <span className="parent-summary">{issue.parent.summary}</span>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                        <button className="link-btn" onClick={() => setEditingParent(true)}>
+                          {issue.parent ? 'Edit' : 'Set parent'}
+                        </button>
+                      </div>
+                    )}
+                  </dd>
                   <dt>Reporter</dt>
                   <dd>
                     <Person person={issue.reporter} />
@@ -288,6 +340,83 @@ export function IssueDetailModal({
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Debounced search-and-select for choosing a parent issue. Mirrors SearchPanel's
+// result list, but selecting a result sets the parent instead of opening it.
+function ParentPicker({
+  boardId,
+  pending,
+  error,
+  hasParent,
+  onSelect,
+  onClear,
+  onCancel,
+}: {
+  boardId?: string
+  pending: boolean
+  error: unknown
+  hasParent: boolean
+  onSelect: (key: string) => void
+  onClear: () => void
+  onCancel: () => void
+}) {
+  const [input, setInput] = useState('')
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    if (input === q) return
+    const t = setTimeout(() => setQ(input), 300)
+    return () => clearTimeout(t)
+  }, [input, q])
+
+  const { data: results, isFetching } = useSearch(q, boardId, false)
+  const open = q.trim().length > 0
+
+  return (
+    <div className="parent-picker">
+      <input
+        type="search"
+        autoFocus
+        placeholder="Search issues…"
+        value={input}
+        disabled={pending}
+        onChange={(e) => setInput(e.target.value)}
+      />
+      {open && (
+        <div className="search-results">
+          {isFetching && <div className="search-item muted">Searching…</div>}
+          {!isFetching && results?.length === 0 && (
+            <div className="search-item muted">No matches</div>
+          )}
+          {results?.map((i) => (
+            <button
+              key={i.key}
+              type="button"
+              className="search-item"
+              disabled={pending}
+              onClick={() => onSelect(i.key)}
+            >
+              <span className="card-key">{i.key}</span>
+              <span className="search-summary">{i.summary}</span>
+              <span className="muted">{i.statusName}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <InlineError error={error} />
+      <div className="parent-picker-actions">
+        {hasParent && (
+          <button className="link-btn" disabled={pending} onClick={onClear}>
+            Clear parent
+          </button>
+        )}
+        <button className="link-btn" disabled={pending} onClick={onCancel}>
+          Cancel
+        </button>
       </div>
     </div>
   )

@@ -105,8 +105,10 @@ export function BoardPage() {
       {openIssueKey && (
         <IssueDetailModal
           issueKey={openIssueKey}
+          boardId={boardId}
           onClose={() => setOpenIssueKey(null)}
           onDelete={handleDelete}
+          onOpen={setOpenIssueKey}
         />
       )}
     </div>

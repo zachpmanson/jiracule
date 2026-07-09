@@ -367,7 +367,7 @@ export async function getIssue(auth: JiraAuth, issueKey: string): Promise<Issue>
 }
 
 const DETAIL_FIELDS =
-  'summary,status,assignee,issuetype,priority,description,reporter,created,updated,labels,comment'
+  'summary,status,assignee,issuetype,priority,description,reporter,created,updated,labels,comment,parent'
 
 interface RawPerson {
   accountId: string
@@ -391,6 +391,7 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
         created?: string
         updated?: string
         labels?: string[]
+        parent?: { key: string; fields?: { summary?: string } }
         comment?: {
           comments?: Array<{
             id: string
@@ -416,6 +417,7 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
     ...base,
     description: adfToRich(f.description),
     reporter: toAssignee(f.reporter),
+    parent: f.parent ? { key: f.parent.key, summary: f.parent.fields?.summary } : undefined,
     labels: f.labels ?? [],
     created: f.created,
     updated: f.updated,
@@ -467,6 +469,16 @@ export async function updateIssueAssignee(
 ): Promise<void> {
   await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
     fields: { assignee: accountId ? { accountId } : null },
+  })
+}
+
+export async function updateIssueParent(
+  auth: JiraAuth,
+  issueKey: string,
+  parentKey: string | null,
+): Promise<void> {
+  await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    fields: { parent: parentKey ? { key: parentKey } : null },
   })
 }
 

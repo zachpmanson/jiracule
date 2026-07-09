@@ -48,6 +48,7 @@ export interface Issue {
   issueTypeIconUrl?: string
   priority?: string
   assignee?: Assignee
+  parent?: { key: string; summary?: string }
 }
 
 // One page of a lane's issues, plus the cursor for the next page and the lane's

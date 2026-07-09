@@ -24,6 +24,7 @@ import {
   transitionIssue,
   updateIssueAssignee,
   updateIssueDescription,
+  updateIssueParent,
   updateIssueSummary,
 } from './server/jira.functions'
 
@@ -93,6 +94,15 @@ export function useUpdateAssignee(issueKey: string) {
   return useMutation({
     mutationFn: (accountId: string | null) =>
       updateIssueAssignee({ data: { issueKey, accountId } }),
+    onSuccess: () => invalidateIssueAndBoards(qc, issueKey),
+  })
+}
+
+// Sets (or clears) the issue's parent, then refreshes the issue and the board.
+export function useUpdateParent(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (parentKey: string | null) => updateIssueParent({ data: { issueKey, parentKey } }),
     onSuccess: () => invalidateIssueAndBoards(qc, issueKey),
   })
 }

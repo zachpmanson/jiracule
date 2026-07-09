@@ -74,6 +74,14 @@ export const updateIssueAssignee = createServerFn({ method: 'POST' })
     return jira.getIssue(context.jira, data.issueKey)
   })
 
+export const updateIssueParent = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string; parentKey: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    await jira.updateIssueParent(context.jira, data.issueKey, data.parentKey)
+    return jira.getIssue(context.jira, data.issueKey)
+  })
+
 export const addIssueComment = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator((d: { issueKey: string; body: string }) => d)
