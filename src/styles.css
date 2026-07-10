@@ -31,11 +31,27 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+  /* The page itself never scrolls; scrolling lives in inner regions only. */
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   font: 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
   background: var(--bg);
+}
+
+/* Root layout: a single viewport-tall column. Header is fixed height; the
+   content region flexes to fill whatever is left. */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .spacer {
@@ -157,8 +173,22 @@ button.primary {
 }
 
 /* --- content --- */
+/* Fills the space under the header. On the board page an inner flex chain sizes
+   everything to this box; other pages (board list) scroll inside it if long. */
 .content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   padding: 16px;
+}
+
+/* Board page: a full-height column so the board can flex to fill the content
+   region rather than being pinned to a hard-coded viewport calculation. */
+.board-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .placeholder {
@@ -206,6 +236,7 @@ button.primary {
 
 /* --- toolbar --- */
 .toolbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -287,6 +318,8 @@ button.search-item:hover {
 
 /* --- board --- */
 .board {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 12px;
   align-items: stretch;
@@ -303,8 +336,8 @@ button.search-item:hover {
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  /* fixed height so stacked lanes can divide the space equally */
-  height: calc(100vh - 128px);
+  /* fill the board's height so stacked lanes can divide the space equally */
+  height: 100%;
 }
 .column-header {
   flex: 0 0 auto;
