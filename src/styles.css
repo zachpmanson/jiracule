@@ -181,6 +181,13 @@ button.primary {
   overflow: auto;
   padding: 16px;
 }
+/* On the board page the board owns its horizontal + bottom padding so those
+   insets scroll with the columns (padding sits after the last column and scrolls
+   away on the left, rather than being clipped by a static wrapper). The toolbar
+   re-adds the top + side insets above it. */
+.content:has(.board-page) {
+  padding: 0;
+}
 
 /* Board page: a full-height column so the board can flex to fill the content
    region rather than being pinned to a hard-coded viewport calculation. */
@@ -240,6 +247,7 @@ button.primary {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 16px 16px 0;
   margin-bottom: 12px;
 }
 
@@ -323,9 +331,10 @@ button.search-item:hover {
   display: flex;
   gap: 12px;
   align-items: stretch;
-  /* the board scrolls sideways when there are more columns than fit */
+  /* the board scrolls sideways when there are more columns than fit; the
+     horizontal + bottom padding lives here so it scrolls with the columns */
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding: 0 16px 16px;
 }
 .column {
   /* every column is the same fixed width; min-width:0 keeps a wide card from
