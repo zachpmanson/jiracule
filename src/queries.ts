@@ -18,14 +18,18 @@ import {
   getIssueDetail,
   getProjectIssueTypes,
   getIssueTransitions,
+  getLabelSuggestions,
   getLaneIssues,
   getMe,
+  getPriorities,
   moveIssue,
   searchIssues,
   transitionIssue,
   updateIssueAssignee,
   updateIssueDescription,
+  updateIssueLabels,
   updateIssueParent,
+  updateIssuePriority,
   updateIssueSummary,
 } from './server/jira.functions'
 
@@ -45,6 +49,8 @@ export const keys = {
   assignable: (issueKey: string) => ['issue', issueKey, 'assignable'] as const,
   transitions: (issueKey: string) => ['issue', issueKey, 'transitions'] as const,
   search: (q: string, boardId?: string, jql?: boolean) => ['search', q, boardId, jql] as const,
+  priorities: ['priorities'] as const,
+  labelSuggest: (q: string) => ['labels', 'suggest', q] as const,
 }
 
 // Refresh a single issue's detail plus every board (a mutated field — summary,
@@ -106,6 +112,45 @@ export function useUpdateParent(issueKey: string) {
   return useMutation({
     mutationFn: (parentKey: string | null) => updateIssueParent({ data: { issueKey, parentKey } }),
     onSuccess: () => invalidateIssueAndBoards(qc, issueKey),
+  })
+}
+
+// Sets the issue's priority, then refreshes the issue and the board (priority
+// shows on cards).
+export function useUpdatePriority(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (priorityName: string) => updateIssuePriority({ data: { issueKey, priorityName } }),
+    onSuccess: () => invalidateIssueAndBoards(qc, issueKey),
+  })
+}
+
+// Replaces the issue's labels. Labels aren't shown on cards, so only the issue
+// detail needs refreshing (mirrors useUpdateDescription).
+export function useUpdateLabels(issueKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (labels: string[]) => updateIssueLabels({ data: { issueKey, labels } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.issue(issueKey) }),
+  })
+}
+
+// The instance's priority scheme, for the priority dropdown. Rarely changes.
+export function usePriorities() {
+  return useQuery({
+    queryKey: keys.priorities,
+    queryFn: () => getPriorities(),
+    staleTime: 5 * 60_000,
+  })
+}
+
+// Label autocomplete suggestions, keyed by the (debounced) query. Only runs
+// once the caller has typed something.
+export function useLabelSuggestions(query: string) {
+  return useQuery({
+    queryKey: keys.labelSuggest(query),
+    queryFn: () => getLabelSuggestions({ data: { query } }),
+    enabled: query.trim().length > 0,
   })
 }
 

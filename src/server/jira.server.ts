@@ -522,6 +522,52 @@ export async function updateIssueParent(
   })
 }
 
+// Replaces the issue's label set wholesale (Jira takes a plain string array).
+export async function updateIssueLabels(
+  auth: JiraAuth,
+  issueKey: string,
+  labels: string[],
+): Promise<void> {
+  await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    fields: { labels },
+  })
+}
+
+// Sets priority by name — the codebase only stores the priority name (see
+// toIssue), so name (not id) is what we have on hand and Jira accepts it.
+export async function updateIssuePriority(
+  auth: JiraAuth,
+  issueKey: string,
+  priorityName: string,
+): Promise<void> {
+  await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    fields: { priority: { name: priorityName } },
+  })
+}
+
+// Autocomplete suggestions for the label field, via Jira's own label-suggest
+// endpoint (the v1 API its UI uses). Degrades to [] on failure so the editor
+// still lets you type and create labels freely.
+export async function labelSuggestions(auth: JiraAuth, query: string): Promise<string[]> {
+  try {
+    const r = await jiraFetch<{ suggestions?: { label: string }[] }>(
+      auth,
+      'GET',
+      `/rest/api/1.0/labels/suggest?query=${encodeURIComponent(query)}`,
+    )
+    return (r?.suggestions ?? []).map((s) => s.label)
+  } catch {
+    return []
+  }
+}
+
+// The instance's global priority scheme. Names populate the priority dropdown
+// and match the value stored on the issue.
+export async function listPriorities(auth: JiraAuth): Promise<{ id: string; name: string }[]> {
+  const r = await jiraFetch<{ id: string; name: string }[]>(auth, 'GET', '/rest/api/3/priority')
+  return (r ?? []).map((p) => ({ id: p.id, name: p.name }))
+}
+
 // assignableUsers lists the people who can be assigned to a given issue (scoped
 // to the issue's project by Jira). Used to populate the reassign dropdown.
 export async function assignableUsers(auth: JiraAuth, issueKey: string): Promise<Assignee[]> {
