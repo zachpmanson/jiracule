@@ -29,7 +29,7 @@ export function SearchPanel({
   // Debounce edits into the committed query (only when actually changed).
   useEffect(() => {
     if (input === q) return
-    const t = setTimeout(() => onQueryChange(input), 300)
+    const t = setTimeout(() => onQueryChange(input), 600)
     return () => clearTimeout(t)
   }, [input, q, onQueryChange])
 
