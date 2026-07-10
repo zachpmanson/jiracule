@@ -173,7 +173,9 @@ export function IssueDetailModal({
                   onOpen={onOpen}
                 />
 
-                <div className="section-label">Comments ({issue.comments.length})</div>
+                <div className="section-label section-label-spaced">
+                  Comments ({issue.comments.length})
+                </div>
                 {issue.comments.length > 0 && (
                   <ul className="comments">
                     {issue.comments.map((c) => (
@@ -374,7 +376,7 @@ function SubtaskSection({
   const [adding, setAdding] = useState(false)
   return (
     <>
-      <div className="section-label">
+      <div className="section-label section-label-spaced">
         Subtasks ({subtasks.length})
         {canAdd && !adding && (
           <button className="link-btn" onClick={() => setAdding(true)}>

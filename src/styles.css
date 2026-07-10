@@ -672,6 +672,9 @@ button.parent-chip:hover {
 .comment-composer {
   margin-top: 4px;
 }
+.section-label-spaced {
+  margin-top: 16px;
+}
 .subtasks {
   list-style: none;
   margin: 0 0 14px;
