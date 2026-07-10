@@ -180,7 +180,13 @@ export function useCreateIssue(boardId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateIssueInput) => createIssue({ data: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }),
+    // Refresh the board now, then again after the index catches up: Jira's
+    // /search/jql is eventually consistent, so an immediate refetch can miss the
+    // just-created issue (same lag the move mutation reconciles around).
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+      setTimeout(() => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }), RECONCILE_DELAY_MS)
+    },
   })
 }
 
@@ -203,7 +209,10 @@ export function useCreateSubtask(parentKey: string, boardId?: string) {
     mutationFn: (input: CreateIssueInput) => createIssue({ data: { ...input, parentKey } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.issue(parentKey) })
-      if (boardId) qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+      if (boardId) {
+        qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+        setTimeout(() => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }), RECONCILE_DELAY_MS)
+      }
     },
   })
 }
