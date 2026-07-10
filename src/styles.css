@@ -661,11 +661,27 @@ button.search-item:hover {
   gap: 4px;
 }
 .label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   background: var(--col-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 12px;
+}
+/* The × remove button shown on chips inside the labels editor. */
+.label-chip button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.label-chip button:hover {
+  color: var(--danger);
 }
 .parent-row {
   display: flex;

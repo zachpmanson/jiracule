@@ -87,6 +87,31 @@ export const updateIssueParent = createServerFn({ method: 'POST' })
     return jira.getIssue(context.jira, data.issueKey)
   })
 
+export const updateIssueLabels = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string; labels: string[] }) => d)
+  .handler(async ({ data, context }) => {
+    await jira.updateIssueLabels(context.jira, data.issueKey, data.labels)
+    return jira.getIssue(context.jira, data.issueKey)
+  })
+
+export const updateIssuePriority = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator((d: { issueKey: string; priorityName: string }) => d)
+  .handler(async ({ data, context }) => {
+    await jira.updateIssuePriority(context.jira, data.issueKey, data.priorityName)
+    return jira.getIssue(context.jira, data.issueKey)
+  })
+
+export const getLabelSuggestions = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .validator((d: { query: string }) => d)
+  .handler(({ data, context }) => jira.labelSuggestions(context.jira, data.query))
+
+export const getPriorities = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .handler(({ context }) => jira.listPriorities(context.jira))
+
 export const addIssueComment = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator((d: { issueKey: string; body: string }) => d)

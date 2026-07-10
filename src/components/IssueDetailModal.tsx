@@ -7,12 +7,16 @@ import {
   useDeleteSubtask,
   useIssueDetail,
   useIssueTransitions,
+  useLabelSuggestions,
+  usePriorities,
   useProjectIssueTypes,
   useSearch,
   useTransitionIssue,
   useUpdateAssignee,
   useUpdateDescription,
+  useUpdateLabels,
   useUpdateParent,
+  useUpdatePriority,
   useUpdateSummary,
 } from '../queries'
 import { Person } from './Avatar'
@@ -49,6 +53,9 @@ export function IssueDetailModal({
   const updateDesc = useUpdateDescription(issueKey)
   const updateSummary = useUpdateSummary(issueKey)
   const updateParent = useUpdateParent(issueKey)
+  const updatePriority = useUpdatePriority(issueKey)
+  const updateLabels = useUpdateLabels(issueKey)
+  const { data: priorities } = usePriorities()
   const addComment = useAddComment(issueKey)
 
   const [editingDesc, setEditingDesc] = useState(false)
@@ -57,6 +64,7 @@ export function IssueDetailModal({
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [editingParent, setEditingParent] = useState(false)
+  const [editingLabels, setEditingLabels] = useState(false)
 
   function startEditTitle() {
     setTitleDraft(issue?.summary ?? '')
@@ -88,11 +96,12 @@ export function IssueDetailModal({
       if (editingTitle) setEditingTitle(false)
       else if (editingDesc) setEditingDesc(false)
       else if (editingParent) setEditingParent(false)
+      else if (editingLabels) setEditingLabels(false)
       else onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [editingTitle, editingDesc, editingParent, onClose])
+  }, [editingTitle, editingDesc, editingParent, editingLabels, onClose])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -310,19 +319,61 @@ export function IssueDetailModal({
                   <dt>Type</dt>
                   <dd>{issue.issueType ?? '—'}</dd>
                   <dt>Priority</dt>
-                  <dd>{issue.priority ?? '—'}</dd>
+                  <dd>
+                    <select
+                      className="assignee-select"
+                      value={issue.priority ?? ''}
+                      disabled={updatePriority.isPending}
+                      onChange={(e) => {
+                        if (e.target.value) updatePriority.mutate(e.target.value)
+                      }}
+                    >
+                      {/* Keep the current priority selectable even if the list
+                          hasn't loaded or doesn't include it. */}
+                      {issue.priority &&
+                        !(priorities ?? []).some((p) => p.name === issue.priority) && (
+                          <option value={issue.priority}>{issue.priority}</option>
+                        )}
+                      {!issue.priority && <option value="">—</option>}
+                      {(priorities ?? []).map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <InlineError error={updatePriority.error} />
+                  </dd>
                   <dt>Labels</dt>
                   <dd>
-                    {issue.labels.length ? (
-                      <span className="labels">
-                        {issue.labels.map((l) => (
-                          <span key={l} className="label-chip">
-                            {l}
-                          </span>
-                        ))}
-                      </span>
+                    {editingLabels ? (
+                      <LabelsEditor
+                        initial={issue.labels}
+                        pending={updateLabels.isPending}
+                        error={updateLabels.error}
+                        onSave={(labels) =>
+                          updateLabels.mutate(labels, {
+                            onSuccess: () => setEditingLabels(false),
+                          })
+                        }
+                        onCancel={() => setEditingLabels(false)}
+                      />
                     ) : (
-                      '—'
+                      <div className="parent-row">
+                        {issue.labels.length ? (
+                          <span className="labels">
+                            {issue.labels.map((l) => (
+                              <span key={l} className="label-chip">
+                                {l}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                        <button className="link-btn" onClick={() => setEditingLabels(true)}>
+                          {issue.labels.length ? 'Edit' : 'Add labels'}
+                        </button>
+                      </div>
                     )}
                   </dd>
                   <dt>Created</dt>
@@ -585,6 +636,129 @@ function ParentPicker({
             Clear parent
           </button>
         )}
+        <button className="link-btn" disabled={pending} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Chip input for the label set: shows current labels as removable chips, and a
+// debounced search box that autocompletes existing Jira labels (or creates a new
+// one from the typed text). Editing is against a local draft; Save commits it.
+function LabelsEditor({
+  initial,
+  pending,
+  error,
+  onSave,
+  onCancel,
+}: {
+  initial: string[]
+  pending: boolean
+  error: unknown
+  onSave: (labels: string[]) => void
+  onCancel: () => void
+}) {
+  const [draft, setDraft] = useState<string[]>(initial)
+  const [input, setInput] = useState('')
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    if (input === q) return
+    const t = setTimeout(() => setQ(input), 300)
+    return () => clearTimeout(t)
+  }, [input, q])
+
+  const { data: suggestions, isFetching } = useLabelSuggestions(q)
+
+  function add(label: string) {
+    const l = label.trim()
+    if (!l || draft.includes(l)) {
+      setInput('')
+      return
+    }
+    setDraft([...draft, l])
+    setInput('')
+    setQ('')
+  }
+  function remove(label: string) {
+    setDraft(draft.filter((l) => l !== label))
+  }
+
+  const typed = input.trim()
+  // Suggestions not already chosen; Jira labels can't contain spaces.
+  const options = (suggestions ?? []).filter((s) => !draft.includes(s))
+  const canCreate = typed.length > 0 && !options.includes(typed) && !draft.includes(typed)
+  const open = q.trim().length > 0
+
+  return (
+    <div className="parent-picker">
+      {draft.length > 0 && (
+        <span className="labels">
+          {draft.map((l) => (
+            <span key={l} className="label-chip">
+              {l}
+              <button
+                type="button"
+                aria-label={`Remove ${l}`}
+                disabled={pending}
+                onClick={() => remove(l)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </span>
+      )}
+      <input
+        type="search"
+        autoFocus
+        placeholder="Add a label…"
+        value={input}
+        disabled={pending}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && typed) {
+            e.preventDefault()
+            add(typed)
+          }
+        }}
+      />
+      {open && (
+        <div className="search-results">
+          {isFetching && <div className="search-item muted">Searching…</div>}
+          {options.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="search-item"
+              disabled={pending}
+              onClick={() => add(s)}
+            >
+              {s}
+            </button>
+          ))}
+          {canCreate && (
+            <button
+              type="button"
+              className="search-item"
+              disabled={pending}
+              onClick={() => add(typed)}
+            >
+              + create “{typed}”
+            </button>
+          )}
+          {!isFetching && options.length === 0 && !canCreate && (
+            <div className="search-item muted">No matches</div>
+          )}
+        </div>
+      )}
+      <InlineError error={error} />
+      <div className="parent-picker-actions">
+        <button className="link-btn" disabled={pending} onClick={() => onSave(draft)}>
+          Save
+        </button>
         <button className="link-btn" disabled={pending} onClick={onCancel}>
           Cancel
         </button>
