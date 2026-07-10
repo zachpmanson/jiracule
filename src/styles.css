@@ -487,6 +487,17 @@ button.search-item:hover {
 }
 
 /* --- modal --- */
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -496,6 +507,7 @@ button.search-item:hover {
   justify-content: center;
   padding-top: 4vh;
   z-index: 50;
+  animation: modal-backdrop-in 150ms ease-out;
 }
 .modal {
   background: var(--surface);
@@ -506,6 +518,14 @@ button.search-item:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  animation: modal-in 180ms ease-out;
+}
+/* Respect users who ask for less motion — fade only, no movement. */
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal {
+    animation: modal-backdrop-in 120ms ease-out;
+  }
 }
 .modal h2 {
   margin: 0 0 4px;
