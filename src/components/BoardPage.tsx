@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
 import {
   useBoardAssignees,
@@ -48,6 +48,17 @@ export function BoardPage() {
 
   const [creating, setCreating] = useState(false)
   const [openIssueKey, setOpenIssueKey] = useState<string | null>(null)
+
+  // Reflect the current board's name in the document title, restoring the
+  // default on unmount. Board data is fetched client-side, so this can't live
+  // in the route's static `head`.
+  useEffect(() => {
+    if (!board?.name) return
+    document.title = `${board.name} · jiracule`
+    return () => {
+      document.title = 'jiracule'
+    }
+  }, [board?.name])
 
   const assignees = assigneesQ.data ?? []
 
