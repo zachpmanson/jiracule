@@ -4,8 +4,8 @@ import { errMsg } from '../util'
 
 // SearchPanel is a debounced search over the current board's project. In the
 // default mode it matches issue summaries; with the JQL toggle on, the input is
-// sent to Jira as a raw JQL query. The committed query `q` and the `jql` flag
-// both live in the URL (passed in) so searches are shareable/reload-safe.
+// sent to Jira as a raw JQL query. The committed query `q` is ephemeral UI state
+// held by the parent; the `jql` flag lives in the URL so the mode is shareable.
 export function SearchPanel({
   boardId,
   q,
@@ -23,10 +23,10 @@ export function SearchPanel({
 }) {
   const [input, setInput] = useState(q)
 
-  // Reflect external changes to the URL query (e.g. navigation) into the box.
+  // Reflect external resets of the committed query into the box.
   useEffect(() => setInput(q), [q])
 
-  // Debounce edits into the URL (only when actually changed).
+  // Debounce edits into the committed query (only when actually changed).
   useEffect(() => {
     if (input === q) return
     const t = setTimeout(() => onQueryChange(input), 300)

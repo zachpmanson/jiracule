@@ -35,8 +35,8 @@ export function BoardPage() {
   const assigneeFilter = search.assignee ?? ALL
   const setAssigneeFilter = (value: string) =>
     navigate({ search: (p) => ({ ...p, assignee: value === ALL ? undefined : value }), replace: true })
-  const setQuery = (q: string) =>
-    navigate({ search: (p) => ({ ...p, q: q || undefined }), replace: true })
+  // The search query is ephemeral UI state — no need to persist it in the URL.
+  const [query, setQuery] = useState('')
   const jqlMode = search.jql ?? false
   const setJqlMode = (on: boolean) =>
     navigate({ search: (p) => ({ ...p, jql: on || undefined }), replace: true })
@@ -84,7 +84,7 @@ export function BoardPage() {
         </select>
         <SearchPanel
           boardId={boardId}
-          q={search.q ?? ''}
+          q={query}
           jql={jqlMode}
           onQueryChange={setQuery}
           onJqlChange={setJqlMode}

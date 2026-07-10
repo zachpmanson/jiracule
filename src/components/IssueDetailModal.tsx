@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { InlineSegment } from '../types'
+import type { InlineSegment, SubtaskRef } from '../types'
 import {
   useAddComment,
   useAssignableUsers,
+  useCreateSubtask,
+  useDeleteSubtask,
   useIssueDetail,
   useIssueTransitions,
+  useProjectIssueTypes,
   useSearch,
   useTransitionIssue,
   useUpdateAssignee,
@@ -161,6 +164,14 @@ export function IssueDetailModal({
                     )}
                   </div>
                 )}
+
+                <SubtaskSection
+                  parentKey={issueKey}
+                  boardId={boardId}
+                  subtasks={issue.subtasks}
+                  canAdd={!issue.isSubtask}
+                  onOpen={onOpen}
+                />
 
                 <div className="section-label">Comments ({issue.comments.length})</div>
                 {issue.comments.length > 0 && (
@@ -340,6 +351,164 @@ export function IssueDetailModal({
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Lists an issue's subtasks (click-through to open each) and, unless the issue is
+// itself a subtask, offers an inline composer to create a new one.
+function SubtaskSection({
+  parentKey,
+  boardId,
+  subtasks,
+  canAdd,
+  onOpen,
+}: {
+  parentKey: string
+  boardId?: string
+  subtasks: SubtaskRef[]
+  canAdd: boolean
+  onOpen?: (key: string) => void
+}) {
+  const [adding, setAdding] = useState(false)
+  return (
+    <>
+      <div className="section-label">
+        Subtasks ({subtasks.length})
+        {canAdd && !adding && (
+          <button className="link-btn" onClick={() => setAdding(true)}>
+            Add subtask
+          </button>
+        )}
+      </div>
+      {subtasks.length > 0 && (
+        <ul className="subtasks">
+          {subtasks.map((s) => (
+            <li key={s.key}>
+              <SubtaskRow subtask={s} parentKey={parentKey} boardId={boardId} onOpen={onOpen} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {adding && (
+        <SubtaskComposer
+          parentKey={parentKey}
+          boardId={boardId}
+          onClose={() => setAdding(false)}
+        />
+      )}
+    </>
+  )
+}
+
+function SubtaskRow({
+  subtask,
+  parentKey,
+  boardId,
+  onOpen,
+}: {
+  subtask: SubtaskRef
+  parentKey: string
+  boardId?: string
+  onOpen?: (key: string) => void
+}) {
+  const del = useDeleteSubtask(parentKey, boardId)
+  return (
+    <div className="subtask-row">
+      <button
+        type="button"
+        className="subtask-open"
+        onClick={() => onOpen?.(subtask.key)}
+        title={subtask.summary || subtask.key}
+      >
+        {subtask.issueTypeIconUrl && (
+          <img src={subtask.issueTypeIconUrl} alt="" className="type-icon" />
+        )}
+        <span className="card-key">{subtask.key}</span>
+        <span className="subtask-summary">{subtask.summary}</span>
+        <span className="status-badge">{subtask.statusName}</span>
+      </button>
+      <button
+        className="icon-btn"
+        title={`Delete ${subtask.key}`}
+        disabled={del.isPending}
+        onClick={() => {
+          if (window.confirm(`Delete ${subtask.key}? This cannot be undone.`)) del.mutate(subtask.key)
+        }}
+      >
+        ×
+      </button>
+      <InlineError error={del.error} />
+    </div>
+  )
+}
+
+// Inline composer for a new subtask. Resolves the project's subtask issue-type
+// name (required by create-issue) from the parent's project, derived from its key.
+function SubtaskComposer({
+  parentKey,
+  boardId,
+  onClose,
+}: {
+  parentKey: string
+  boardId?: string
+  onClose: () => void
+}) {
+  const projectKey = parentKey.split('-')[0]
+  const { data: types } = useProjectIssueTypes(projectKey)
+  const create = useCreateSubtask(parentKey, boardId)
+  const [summary, setSummary] = useState('')
+
+  const subtaskType = (types ?? []).find((t) => t.subtask)
+  const noSubtaskType = types != null && !subtaskType
+
+  function submit() {
+    const s = summary.trim()
+    if (!s || !subtaskType) return
+    create.mutate(
+      { projectKey, issueType: subtaskType.name, summary: s },
+      { onSuccess: () => onClose() },
+    )
+  }
+
+  if (noSubtaskType) {
+    return (
+      <div className="muted subtask-composer">
+        This project has no subtask issue type.{' '}
+        <button className="link-btn" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="subtask-composer">
+      <input
+        type="text"
+        autoFocus
+        placeholder="Subtask summary…"
+        value={summary}
+        disabled={create.isPending}
+        onChange={(e) => setSummary(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit()
+          else if (e.key === 'Escape') onClose()
+        }}
+      />
+      <InlineError error={create.error} />
+      <div className="subtask-composer-actions">
+        <button
+          className="primary"
+          disabled={create.isPending || !summary.trim() || !subtaskType}
+          onClick={submit}
+        >
+          {create.isPending ? 'Adding…' : 'Add'}
+        </button>
+        <button className="link-btn" disabled={create.isPending} onClick={onClose}>
+          Cancel
+        </button>
       </div>
     </div>
   )

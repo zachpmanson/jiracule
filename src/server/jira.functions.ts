@@ -31,6 +31,11 @@ export const getBoardAssignees = createServerFn({ method: 'GET' })
   .validator((d: { projectKey: string }) => d)
   .handler(({ data, context }) => jira.boardAssignees(context.jira, data.projectKey))
 
+export const getProjectIssueTypes = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .validator((d: { projectKey: string }) => d)
+  .handler(({ data, context }) => jira.projectIssueTypes(context.jira, data.projectKey))
+
 export const getIssueDetail = createServerFn({ method: 'GET' })
   .middleware([authMiddleware])
   .validator((d: { issueKey: string }) => d)

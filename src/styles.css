@@ -672,6 +672,56 @@ button.parent-chip:hover {
 .comment-composer {
   margin-top: 4px;
 }
+.subtasks {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+button.subtask-open {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+button.subtask-open:hover {
+  border-color: var(--muted);
+}
+.subtask-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subtask-composer {
+  margin: 0 0 14px;
+}
+.subtask-composer input[type='text'] {
+  width: 100%;
+  font: inherit;
+}
+.subtask-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
 .inline-link {
   color: var(--accent);
   text-decoration: underline;

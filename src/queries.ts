@@ -16,6 +16,7 @@ import {
   getBoardColumns,
   getBoards,
   getIssueDetail,
+  getProjectIssueTypes,
   getIssueTransitions,
   getLaneIssues,
   getMe,
@@ -33,6 +34,7 @@ export const keys = {
   boards: ['boards'] as const,
   columns: (boardId: string) => ['boards', boardId, 'columns'] as const,
   boardAssignees: (projectKey: string) => ['boards', projectKey, 'assignees'] as const,
+  projectIssueTypes: (projectKey: string) => ['project', projectKey, 'issueTypes'] as const,
   // Prefix matching every lane query of a board (for bulk invalidation).
   lanes: (boardId: string) => ['board', boardId, 'lane'] as const,
   // A single lane's paginated issues. statusIds are sorted so the key is stable
@@ -179,6 +181,43 @@ export function useCreateIssue(boardId: string) {
   return useMutation({
     mutationFn: (input: CreateIssueInput) => createIssue({ data: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }),
+  })
+}
+
+// A project's issue types, tagged with whether each is a subtask type. Used to
+// discover the subtask-type name required to create a subtask.
+export function useProjectIssueTypes(projectKey: string | null) {
+  return useQuery({
+    queryKey: keys.projectIssueTypes(projectKey ?? ''),
+    queryFn: () => getProjectIssueTypes({ data: { projectKey: projectKey! } }),
+    enabled: !!projectKey,
+    staleTime: 5 * 60_000,
+  })
+}
+
+// Creates a subtask under `parentKey`, then refreshes the parent's detail (so
+// the subtask list updates) and the board (the subtask is also a card).
+export function useCreateSubtask(parentKey: string, boardId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateIssueInput) => createIssue({ data: { ...input, parentKey } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.issue(parentKey) })
+      if (boardId) qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+    },
+  })
+}
+
+// Deletes an issue and refreshes both the board and the given parent's detail
+// (used when removing a subtask from the detail modal).
+export function useDeleteSubtask(parentKey: string, boardId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (issueKey: string) => deleteIssue({ data: { issueKey } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.issue(parentKey) })
+      if (boardId) qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+    },
   })
 }
 

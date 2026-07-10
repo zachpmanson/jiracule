@@ -96,6 +96,6 @@ port. When the pnpm lockfile changes, `nix build` will print the new
 
 ## Not in v1
 
-Sprints/backlog, attachments/subtasks, arbitrary field editing, multi-site
+Sprints/backlog, attachments, arbitrary field editing, multi-site
 picker (uses the first accessible Jira site), real-time updates, JQL box (search
 uses JQL under the hood).

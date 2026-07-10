@@ -73,6 +73,17 @@ export interface Comment {
   updated?: string
 }
 
+// A lightweight reference to a child (sub-)issue, as surfaced on the parent's
+// read-only `subtasks` field. Enough to render a row and click through to it.
+export interface SubtaskRef {
+  key: string
+  summary: string
+  statusId: string
+  statusName: string
+  issueTypeIconUrl?: string
+  assignee?: Assignee
+}
+
 export interface IssueDetail extends Issue {
   description: InlineSegment[]
   reporter?: Assignee
@@ -81,6 +92,10 @@ export interface IssueDetail extends Issue {
   updated?: string
   browseUrl?: string
   comments: Comment[]
+  subtasks: SubtaskRef[]
+  // Whether this issue is itself a subtask type (subtasks can't be nested, so the
+  // UI hides the "add subtask" affordance for these).
+  isSubtask: boolean
 }
 
 export interface Transition {
@@ -96,4 +111,15 @@ export interface CreateIssueInput {
   summary: string
   description?: string
   assigneeId?: string
+  // When set, the created issue is linked as a child of this issue. For subtasks
+  // `issueType` must be a subtask-type name and the project must match the parent.
+  parentKey?: string
+}
+
+// A project issue type, tagged with whether it's a subtask type.
+export interface IssueTypeRef {
+  id: string
+  name: string
+  iconUrl?: string
+  subtask: boolean
 }

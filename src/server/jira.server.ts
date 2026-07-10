@@ -12,8 +12,10 @@ import type {
   InlineSegment,
   Issue,
   IssueDetail,
+  IssueTypeRef,
   LanePage,
   StatusRef,
+  SubtaskRef,
   Transition,
   User,
 } from '../types'
@@ -95,7 +97,7 @@ interface RawIssue {
     summary: string
     status: { id: string; name: string }
     assignee?: { accountId: string; displayName: string; avatarUrls?: Record<string, string> }
-    issuetype?: { name: string; iconUrl?: string }
+    issuetype?: { name: string; iconUrl?: string; subtask?: boolean }
     priority?: { name: string }
   }
 }
@@ -367,7 +369,7 @@ export async function getIssue(auth: JiraAuth, issueKey: string): Promise<Issue>
 }
 
 const DETAIL_FIELDS =
-  'summary,status,assignee,issuetype,priority,description,reporter,created,updated,labels,comment,parent'
+  'summary,status,assignee,issuetype,priority,description,reporter,created,updated,labels,comment,parent,subtasks'
 
 interface RawPerson {
   accountId: string
@@ -392,6 +394,15 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
         updated?: string
         labels?: string[]
         parent?: { key: string; fields?: { summary?: string } }
+        subtasks?: Array<{
+          key: string
+          fields?: {
+            summary?: string
+            status?: { id: string; name: string }
+            issuetype?: { iconUrl?: string }
+            assignee?: RawPerson
+          }
+        }>
         comment?: {
           comments?: Array<{
             id: string
@@ -406,6 +417,14 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
   >(auth, 'GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${DETAIL_FIELDS}`)
   const base = toIssue(ri!)
   const f = ri!.fields
+  const subtasks: SubtaskRef[] = (f.subtasks ?? []).map((s) => ({
+    key: s.key,
+    summary: s.fields?.summary ?? '',
+    statusId: s.fields?.status?.id ?? '',
+    statusName: s.fields?.status?.name ?? '',
+    issueTypeIconUrl: s.fields?.issuetype?.iconUrl,
+    assignee: toAssignee(s.fields?.assignee),
+  }))
   const comments: Comment[] = (f.comment?.comments ?? []).map((c) => ({
     id: c.id,
     author: toAssignee(c.author),
@@ -423,7 +442,27 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
     updated: f.updated,
     browseUrl: `${auth.siteUrl}/browse/${encodeURIComponent(issueKey)}`,
     comments,
+    subtasks,
+    isSubtask: f.issuetype?.subtask ?? false,
   }
+}
+
+// projectIssueTypes lists a project's issue types, tagged with whether each is a
+// subtask type. Used to discover the subtask-type name required when creating a
+// subtask (the create-issue API takes an issue-type *name*).
+export async function projectIssueTypes(
+  auth: JiraAuth,
+  projectKey: string,
+): Promise<IssueTypeRef[]> {
+  const r = await jiraFetch<{
+    issueTypes?: Array<{ id: string; name: string; iconUrl?: string; subtask?: boolean }>
+  }>(auth, 'GET', `/rest/api/3/project/${encodeURIComponent(projectKey)}`)
+  return (r?.issueTypes ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    iconUrl: t.iconUrl,
+    subtask: t.subtask ?? false,
+  }))
 }
 
 export async function createIssue(auth: JiraAuth, input: CreateIssueInput): Promise<string> {
@@ -434,6 +473,7 @@ export async function createIssue(auth: JiraAuth, input: CreateIssueInput): Prom
   }
   if (input.description) fields.description = adfDoc(input.description)
   if (input.assigneeId) fields.assignee = { accountId: input.assigneeId }
+  if (input.parentKey) fields.parent = { key: input.parentKey }
   const r = await jiraFetch<{ key: string }>(auth, 'POST', '/rest/api/3/issue', { fields })
   return r!.key
 }
