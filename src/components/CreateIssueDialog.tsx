@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Assignee } from '../types'
-import { useCreateIssue } from '../queries'
+import { useCreateIssue, useSearch } from '../queries'
 import { InlineError } from './InlineError'
 
 export function CreateIssueDialog({
@@ -20,6 +20,7 @@ export function CreateIssueDialog({
   const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
+  const [parent, setParent] = useState<{ key: string; summary: string } | null>(null)
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -31,6 +32,7 @@ export function CreateIssueDialog({
         summary: summary.trim(),
         description: description.trim() || undefined,
         assigneeId: assigneeId || undefined,
+        parentKey: parent?.key,
       },
       { onSuccess: onClose },
     )
@@ -38,7 +40,7 @@ export function CreateIssueDialog({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+      <form className="modal modal-create" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2>New issue</h2>
         <label>
           Project key
@@ -67,6 +69,10 @@ export function CreateIssueDialog({
             ))}
           </select>
         </label>
+        <div className="create-parent">
+          <span className="create-parent-label">Parent</span>
+          <ParentField boardId={boardId} parent={parent} onChange={setParent} />
+        </div>
         <InlineError error={create.error} />
         <div className="modal-actions">
           <button type="button" onClick={onClose}>
@@ -77,6 +83,80 @@ export function CreateIssueDialog({
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+// Debounced search-and-select for an optional parent issue. When a parent is
+// chosen it shows a chip with a clear button; otherwise a search box scoped to
+// the current board's project. Mirrors the detail modal's ParentPicker.
+function ParentField({
+  boardId,
+  parent,
+  onChange,
+}: {
+  boardId: string
+  parent: { key: string; summary: string } | null
+  onChange: (p: { key: string; summary: string } | null) => void
+}) {
+  const [input, setInput] = useState('')
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    if (input === q) return
+    const t = setTimeout(() => setQ(input), 300)
+    return () => clearTimeout(t)
+  }, [input, q])
+
+  const { data: results, isFetching } = useSearch(q, boardId, false)
+  const open = q.trim().length > 0
+
+  if (parent) {
+    return (
+      <div className="parent-row">
+        <span className="parent-chip">
+          <span className="card-key">{parent.key}</span>
+          {parent.summary && <span className="parent-summary">{parent.summary}</span>}
+        </span>
+        <button type="button" className="link-btn" onClick={() => onChange(null)}>
+          Clear
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="parent-picker">
+      <input
+        type="search"
+        placeholder="Search issues…"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+      />
+      {open && (
+        <div className="search-results">
+          {isFetching && <div className="search-item muted">Searching…</div>}
+          {!isFetching && results?.length === 0 && (
+            <div className="search-item muted">No matches</div>
+          )}
+          {results?.map((i) => (
+            <button
+              key={i.key}
+              type="button"
+              className="search-item"
+              onClick={() => {
+                onChange({ key: i.key, summary: i.summary })
+                setInput('')
+                setQ('')
+              }}
+            >
+              <span className="card-key">{i.key}</span>
+              <span className="search-summary">{i.summary}</span>
+              <span className="muted">{i.statusName}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

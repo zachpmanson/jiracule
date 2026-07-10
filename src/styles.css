@@ -490,6 +490,31 @@ button.search-item:hover {
   margin-top: 8px;
 }
 
+/* Roomier create dialog. */
+.modal.modal-create {
+  width: 560px;
+}
+.create-parent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.create-parent .parent-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-weight: 400;
+  color: var(--text);
+}
+
 /* --- issue detail modal --- */
 .modal.detail {
   width: 860px;

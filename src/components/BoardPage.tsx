@@ -47,7 +47,11 @@ export function BoardPage() {
     assigneeFilter === ALL ? undefined : assigneeFilter === MINE ? me?.accountId : assigneeFilter
 
   const [creating, setCreating] = useState(false)
-  const [openIssueKey, setOpenIssueKey] = useState<string | null>(null)
+  // The open issue lives in the URL so the back button closes the modal (and a
+  // reload/share reopens it). Pushed (not replaced) so it's its own history entry.
+  const openIssueKey = search.issue ?? null
+  const setOpenIssueKey = (key: string | null) =>
+    navigate({ search: (p) => ({ ...p, issue: key ?? undefined }) })
 
   // Reflect the current board's name in the document title, restoring the
   // default on unmount. Board data is fetched client-side, so this can't live
