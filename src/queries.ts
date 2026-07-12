@@ -55,10 +55,16 @@ export const keys = {
 
 // Refresh a single issue's detail plus every board (a mutated field — summary,
 // assignee, status — also shows on board cards). Shared by the field-editing
-// mutations below so their invalidation can't drift apart.
+// mutations below so their invalidation can't drift apart. The lane card
+// queries live under the ['board', …] prefix (see keys.lanes), so refetch those
+// too — otherwise a status change never moves the card between columns. Jira's
+// search index lags a transition, so reconcile again after a delay (the same
+// eventual-consistency guard the drag-move path uses).
 function invalidateIssueAndBoards(qc: ReturnType<typeof useQueryClient>, issueKey: string) {
   qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
   qc.invalidateQueries({ queryKey: keys.boards })
+  qc.invalidateQueries({ queryKey: ['board'] })
+  setTimeout(() => qc.invalidateQueries({ queryKey: ['board'] }), RECONCILE_DELAY_MS)
 }
 
 export function useIssueDetail(issueKey: string | null) {
