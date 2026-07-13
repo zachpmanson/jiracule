@@ -600,8 +600,8 @@ button.search-item:hover {
 
 /* --- issue detail modal --- */
 .modal.detail {
-  width: 860px;
-  max-width: 92vw;
+  width: 1100px;
+  max-width: 95vw;
   height: 92vh;
   overflow: hidden; /* inner regions scroll; comments flex to fill the height */
 }
