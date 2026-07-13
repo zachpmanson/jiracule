@@ -506,26 +506,28 @@ function SubtaskRow({
   const transition = useTransitionSubtask(subtask.key, parentKey)
   return (
     <div className="subtask-row">
-      <button
-        type="button"
-        className="subtask-open"
-        onClick={() => onOpen?.(subtask.key)}
-        title={subtask.summary || subtask.key}
-      >
-        {subtask.issueTypeIconUrl && (
-          <img src={subtask.issueTypeIconUrl} alt="" className="type-icon" />
-        )}
-        <span className="card-key">{subtask.key}</span>
-        <span className="subtask-summary">{subtask.summary}</span>
-      </button>
-      <StatusSelect
-        statusName={subtask.statusName}
-        transitions={transitions}
-        pending={transition.isPending}
-        error={transition.error}
-        onSelect={(id) => transition.mutate(id)}
-        className="subtask-status"
-      />
+      <div className="subtask-card">
+        <button
+          type="button"
+          className="subtask-open"
+          onClick={() => onOpen?.(subtask.key)}
+          title={subtask.summary || subtask.key}
+        >
+          {subtask.issueTypeIconUrl && (
+            <img src={subtask.issueTypeIconUrl} alt="" className="type-icon" />
+          )}
+          <span className="card-key">{subtask.key}</span>
+          <span className="subtask-summary">{subtask.summary}</span>
+        </button>
+        <StatusSelect
+          statusName={subtask.statusName}
+          transitions={transitions}
+          pending={transition.isPending}
+          error={transition.error}
+          onSelect={(id) => transition.mutate(id)}
+          className="subtask-status"
+        />
+      </div>
       <button
         className="icon-btn"
         title={`Delete ${subtask.key}`}
