@@ -22,7 +22,11 @@ export function StatusSelect({
   className?: string
 }) {
   if (!transitions || transitions.length === 0) {
-    return <span className="status-badge">{statusName}</span>
+    return (
+      <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-muted bg-column border border-solid border-line rounded-[10px] px-2.5 py-0.5">
+        {statusName}
+      </span>
+    )
   }
   return (
     <>

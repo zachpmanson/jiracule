@@ -4,5 +4,5 @@ import { errMsg } from '../util'
 // is no error. Accepts any thrown value (mutation/query `.error` is `unknown`).
 export function InlineError({ error }: { error: unknown }) {
   if (!error) return null
-  return <div className="inline-error">{errMsg(error)}</div>
+  return <div className="text-danger text-[13px]">{errMsg(error)}</div>
 }

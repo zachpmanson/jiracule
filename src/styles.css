@@ -197,25 +197,6 @@ button.primary {
   font-size: 13px;
 }
 
-.avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-}
-.avatar.sm {
-  width: 20px;
-  height: 20px;
-}
-.avatar.initials {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-size: 9px;
-  font-weight: 700;
-}
-
 /* --- content --- */
 /* Fills the space under the header. On the board page an inner flex chain sizes
    everything to this box; other pages (board list) scroll inside it if long. */
@@ -252,12 +233,9 @@ button.primary {
   color: var(--danger);
 }
 
-.banner.error,
-.inline-error {
+.banner.error {
   color: var(--danger);
   font-size: 13px;
-}
-.banner.error {
   padding: 8px 12px;
   margin-bottom: 8px;
   background: color-mix(in srgb, var(--danger) 12%, transparent);
@@ -435,22 +413,6 @@ button.search-item:hover {
   background: var(--border);
   border-radius: 10px;
   padding: 0 8px;
-}
-/* Statuses a pooled (Agile) column incorporates, shown as chips under its name. */
-.column-statuses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.column-statuses .status-chip {
-  background: var(--border);
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  color: var(--muted);
 }
 .column-body {
   flex: 1;
@@ -699,17 +661,6 @@ button.search-item:hover {
 }
 .icon-btn:hover {
   color: var(--text);
-}
-.status-badge {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  background: var(--col-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2px 10px;
 }
 .status-select,
 .assignee-select {

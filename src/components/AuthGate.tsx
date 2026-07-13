@@ -17,7 +17,7 @@ function ConnectScreen() {
       <div className="connect-card">
         <h1>jiracule</h1>
         <p className="muted">Connect your Jira account to continue.</p>
-        {err && <p className="inline-error">{AUTH_ERRORS[err] ?? 'Sign-in failed.'}</p>}
+        {err && <p className="text-danger text-[13px]">{AUTH_ERRORS[err] ?? 'Sign-in failed.'}</p>}
         <a className="primary connect-btn" href="/auth/login">
           Connect Jira
         </a>
