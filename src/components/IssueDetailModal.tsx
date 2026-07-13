@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Attachment, InlineSegment, SubtaskRef } from '../types'
+import type { Assignee, Attachment, InlineSegment, SubtaskRef } from '../types'
 import { formatBytes } from '../util'
 import {
   useAddComment,
@@ -19,9 +19,11 @@ import {
   useUpdateLabels,
   useUpdateParent,
   useUpdatePriority,
+  useUpdateSubtaskAssignee,
   useUpdateSummary,
 } from '../queries'
-import { Avatar, Person } from './Avatar'
+import { Person } from './Avatar'
+import { AssigneeSelect } from './AssigneeSelect'
 import { InlineEditor } from './InlineEditor'
 import { InlineError } from './InlineError'
 import { RichText } from './Linkified'
@@ -182,6 +184,7 @@ export function IssueDetailModal({
                   parentKey={issueKey}
                   boardId={boardId}
                   subtasks={issue.subtasks}
+                  assignable={assignable}
                   canAdd={!issue.isSubtask}
                   onOpen={onOpen}
                 />
@@ -236,30 +239,13 @@ export function IssueDetailModal({
                   </dd>
                   <dt>Assignee</dt>
                   <dd>
-                    <select
-                      className="assignee-select"
-                      value={issue.assignee?.accountId ?? ''}
-                      disabled={updateAssignee.isPending}
-                      onChange={(e) => updateAssignee.mutate(e.target.value || null)}
-                    >
-                      <option value="">Unassigned</option>
-                      {/* Keep the current assignee selectable even if the assignable
-                          list hasn't loaded or doesn't include them. */}
-                      {issue.assignee &&
-                        !(assignable ?? []).some(
-                          (u) => u.accountId === issue.assignee!.accountId,
-                        ) && (
-                          <option value={issue.assignee.accountId}>
-                            {issue.assignee.displayName}
-                          </option>
-                        )}
-                      {(assignable ?? []).map((u) => (
-                        <option key={u.accountId} value={u.accountId}>
-                          {u.displayName}
-                        </option>
-                      ))}
-                    </select>
-                    <InlineError error={updateAssignee.error} />
+                    <AssigneeSelect
+                      assignee={issue.assignee}
+                      assignable={assignable}
+                      pending={updateAssignee.isPending}
+                      error={updateAssignee.error}
+                      onSelect={(id) => updateAssignee.mutate(id)}
+                    />
                   </dd>
                   <dt>Parent</dt>
                   <dd>
@@ -407,12 +393,14 @@ function SubtaskSection({
   parentKey,
   boardId,
   subtasks,
+  assignable,
   canAdd,
   onOpen,
 }: {
   parentKey: string
   boardId?: string
   subtasks: SubtaskRef[]
+  assignable?: Assignee[]
   canAdd: boolean
   onOpen?: (key: string) => void
 }) {
@@ -431,7 +419,13 @@ function SubtaskSection({
         <ul className="subtasks">
           {subtasks.map((s) => (
             <li key={s.key}>
-              <SubtaskRow subtask={s} parentKey={parentKey} boardId={boardId} onOpen={onOpen} />
+              <SubtaskRow
+                subtask={s}
+                parentKey={parentKey}
+                boardId={boardId}
+                assignable={assignable}
+                onOpen={onOpen}
+              />
             </li>
           ))}
         </ul>
@@ -494,16 +488,19 @@ function SubtaskRow({
   subtask,
   parentKey,
   boardId,
+  assignable,
   onOpen,
 }: {
   subtask: SubtaskRef
   parentKey: string
   boardId?: string
+  assignable?: Assignee[]
   onOpen?: (key: string) => void
 }) {
   const del = useDeleteSubtask(parentKey, boardId)
   const { data: transitions } = useIssueTransitions(subtask.key)
   const transition = useTransitionSubtask(subtask.key, parentKey)
+  const assignee = useUpdateSubtaskAssignee(subtask.key, parentKey)
   return (
     <div className="subtask-row">
       <div className="subtask-card">
@@ -520,7 +517,14 @@ function SubtaskRow({
             <span className="card-key">{subtask.key}</span>
           </button>
           <div className="subtask-meta">
-            {subtask.assignee && <Avatar person={subtask.assignee} size="sm" />}
+            <AssigneeSelect
+              assignee={subtask.assignee}
+              assignable={assignable}
+              pending={assignee.isPending}
+              error={assignee.error}
+              onSelect={(id) => assignee.mutate(id)}
+              className="subtask-assignee"
+            />
             <StatusSelect
               statusName={subtask.statusName}
               transitions={transitions}
@@ -529,6 +533,17 @@ function SubtaskRow({
               onSelect={(id) => transition.mutate(id)}
               className="subtask-status"
             />
+            <button
+              className="icon-btn subtask-delete"
+              title={`Delete ${subtask.key}`}
+              disabled={del.isPending}
+              onClick={() => {
+                if (window.confirm(`Delete ${subtask.key}? This cannot be undone.`))
+                  del.mutate(subtask.key)
+              }}
+            >
+              ×
+            </button>
           </div>
         </div>
         <button
@@ -540,16 +555,6 @@ function SubtaskRow({
           {subtask.summary}
         </button>
       </div>
-      <button
-        className="icon-btn"
-        title={`Delete ${subtask.key}`}
-        disabled={del.isPending}
-        onClick={() => {
-          if (window.confirm(`Delete ${subtask.key}? This cannot be undone.`)) del.mutate(subtask.key)
-        }}
-      >
-        ×
-      </button>
       <InlineError error={del.error} />
     </div>
   )

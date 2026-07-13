@@ -112,6 +112,20 @@ export function useUpdateAssignee(issueKey: string) {
   })
 }
 
+// Like useUpdateAssignee, but for a subtask edited from within its parent's
+// detail: also refreshes the parent so the subtask row reflects the change.
+export function useUpdateSubtaskAssignee(subtaskKey: string, parentKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (accountId: string | null) =>
+      updateIssueAssignee({ data: { issueKey: subtaskKey, accountId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.issue(parentKey) })
+      invalidateIssueAndBoards(qc, subtaskKey)
+    },
+  })
+}
+
 // Sets (or clears) the issue's parent, then refreshes the issue and the board.
 export function useUpdateParent(issueKey: string) {
   const qc = useQueryClient()

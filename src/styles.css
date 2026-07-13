@@ -809,14 +809,13 @@ button.parent-chip:hover {
 }
 .subtask-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
 }
-/* Two-line card: line 1 is icon+id (left) and assignee+status (right); line 2 is
-   the title. A <select> can't nest inside a <button>, so the interactive bits are
-   siblings within the card rather than one big button. */
+/* Two-line card: line 1 is icon+id (left) and assignee+status+delete (right);
+   line 2 is the title. A <select> can't nest inside a <button>, so the
+   interactive bits are siblings within the card rather than one big button. */
 .subtask-card {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -837,9 +836,20 @@ button.parent-chip:hover {
 }
 .subtask-meta {
   flex: 0 0 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* Compact assignee dropdown so the two selects + delete fit on line 1. */
+.subtask-assignee {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 120px;
+}
+/* Delete sits at the card's top-right, in line with the assignee/status. */
+.subtask-delete {
+  flex: 0 0 auto;
 }
 button.subtask-open {
   min-width: 0;
