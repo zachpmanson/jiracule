@@ -264,6 +264,29 @@ button.primary {
   flex: 1;
   min-width: 0;
 }
+/* Hide the browser's native search clear (we render our own). */
+.search-box input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+.search-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.search-clear:hover {
+  color: var(--text);
+}
 .jql-toggle {
   display: inline-flex;
   align-items: center;

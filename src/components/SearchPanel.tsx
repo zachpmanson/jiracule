@@ -45,6 +45,20 @@ export function SearchPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
         />
+        {input && (
+          <button
+            type="button"
+            className="search-clear"
+            title="Clear search"
+            aria-label="Clear search"
+            onClick={() => {
+              setInput('')
+              onQueryChange('')
+            }}
+          >
+            ×
+          </button>
+        )}
         <label className="jql-toggle" title="Treat the query as raw JQL">
           <input type="checkbox" checked={jql} onChange={(e) => onJqlChange(e.target.checked)} />
           JQL
