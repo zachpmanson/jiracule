@@ -16,6 +16,7 @@ export function InlineEditor({
   autoFocus = false,
   placeholder,
   requireNonEmpty = false,
+  singleLine = false,
   className,
 }: {
   value: string
@@ -30,14 +31,26 @@ export function InlineEditor({
   autoFocus?: boolean
   placeholder?: string
   requireNonEmpty?: boolean
+  // Single-line fields (e.g. a title) save on plain Enter; multi-line fields
+  // (descriptions, comments) reserve Enter for newlines and save on Cmd/Ctrl+Enter.
+  singleLine?: boolean
   className?: string
 }) {
+  const canSave = !pending && !(requireNonEmpty && !value.trim())
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== 'Enter') return
+    const wantsSave = singleLine ? !e.shiftKey : e.metaKey || e.ctrlKey
+    if (!wantsSave) return
+    e.preventDefault()
+    if (canSave) onSave()
+  }
   return (
     <div className={`editor${className ? ` ${className}` : ''}`}>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        rows={rows}
+        onKeyDown={handleKeyDown}
+        rows={singleLine ? 1 : rows}
         autoFocus={autoFocus}
         placeholder={placeholder}
       />

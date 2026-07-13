@@ -22,7 +22,7 @@ export function CreateIssueDialog({
   const [assigneeId, setAssigneeId] = useState('')
   const [parent, setParent] = useState<{ key: string; summary: string } | null>(null)
 
-  function submit(e: React.FormEvent) {
+  function submit(e: React.SyntheticEvent) {
     e.preventDefault()
     if (!projectKey.trim() || !summary.trim()) return
     create.mutate(
@@ -56,7 +56,15 @@ export function CreateIssueDialog({
         </label>
         <label>
           Description
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter is a newline here; Cmd/Ctrl+Enter submits like the text inputs do.
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e)
+            }}
+            rows={3}
+          />
         </label>
         <label>
           Assignee

@@ -132,6 +132,7 @@ export function IssueDetailModal({
                 pending={updateSummary.isPending}
                 error={updateSummary.error}
                 requireNonEmpty
+                singleLine
                 autoFocus
               />
             ) : (
