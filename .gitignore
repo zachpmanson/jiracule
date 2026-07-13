@@ -19,3 +19,4 @@ __unconfig*
 # nix build output
 result
 result-*
+.direnv/

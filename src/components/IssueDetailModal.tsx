@@ -13,6 +13,7 @@ import {
   useProjectIssueTypes,
   useSearch,
   useTransitionIssue,
+  useTransitionSubtask,
   useUpdateAssignee,
   useUpdateDescription,
   useUpdateLabels,
@@ -24,6 +25,7 @@ import { Person } from './Avatar'
 import { InlineEditor } from './InlineEditor'
 import { InlineError } from './InlineError'
 import { RichText } from './Linkified'
+import { StatusSelect } from './StatusSelect'
 
 const segmentsToText = (segments: InlineSegment[]) => segments.map((s) => s.text).join('')
 
@@ -224,29 +226,13 @@ export function IssueDetailModal({
                 <dl className="detail-grid">
                   <dt>Status</dt>
                   <dd>
-                    {transitions && transitions.length > 0 ? (
-                      <select
-                        className="status-select"
-                        value=""
-                        disabled={applyTransition.isPending}
-                        onChange={(e) => {
-                          if (e.target.value) applyTransition.mutate(e.target.value)
-                        }}
-                        title="Change status"
-                      >
-                        <option value="">
-                          {applyTransition.isPending ? 'Updating…' : issue.statusName}
-                        </option>
-                        {transitions.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.toStatusName ?? t.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="status-badge">{issue.statusName}</span>
-                    )}
-                    <InlineError error={applyTransition.error} />
+                    <StatusSelect
+                      statusName={issue.statusName}
+                      transitions={transitions}
+                      pending={applyTransition.isPending}
+                      error={applyTransition.error}
+                      onSelect={(id) => applyTransition.mutate(id)}
+                    />
                   </dd>
                   <dt>Assignee</dt>
                   <dd>
@@ -516,6 +502,8 @@ function SubtaskRow({
   onOpen?: (key: string) => void
 }) {
   const del = useDeleteSubtask(parentKey, boardId)
+  const { data: transitions } = useIssueTransitions(subtask.key)
+  const transition = useTransitionSubtask(subtask.key, parentKey)
   return (
     <div className="subtask-row">
       <button
@@ -529,8 +517,15 @@ function SubtaskRow({
         )}
         <span className="card-key">{subtask.key}</span>
         <span className="subtask-summary">{subtask.summary}</span>
-        <span className="status-badge">{subtask.statusName}</span>
       </button>
+      <StatusSelect
+        statusName={subtask.statusName}
+        transitions={transitions}
+        pending={transition.isPending}
+        error={transition.error}
+        onSelect={(id) => transition.mutate(id)}
+        className="subtask-status"
+      />
       <button
         className="icon-btn"
         title={`Delete ${subtask.key}`}

@@ -836,6 +836,11 @@ button.subtask-open:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Keep the per-subtask status dropdown compact so the row stays on one line. */
+.subtask-status {
+  flex: 0 0 auto;
+  max-width: 130px;
+}
 /* --- attachments (read-only) --- */
 .attachments {
   list-style: none;

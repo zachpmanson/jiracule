@@ -189,6 +189,21 @@ export function useTransitionIssue(issueKey: string) {
   })
 }
 
+// Like useTransitionIssue, but for a subtask edited from within its parent's
+// detail: also refreshes the parent so the subtask row's status reflects the
+// change (the row is rendered from the parent's cached detail, not the subtask's).
+export function useTransitionSubtask(subtaskKey: string, parentKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (transitionId: string) => transitionIssue({ data: { issueKey: subtaskKey, transitionId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.transitions(subtaskKey) })
+      qc.invalidateQueries({ queryKey: keys.issue(parentKey) })
+      invalidateIssueAndBoards(qc, subtaskKey)
+    },
+  })
+}
+
 export function useMe() {
   return useQuery({ queryKey: keys.me, queryFn: () => getMe(), staleTime: Infinity })
 }
