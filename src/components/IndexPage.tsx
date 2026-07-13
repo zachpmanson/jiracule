@@ -9,12 +9,19 @@ export function IndexPage() {
   if (error) return <div className="placeholder error">{errMsg(error)}</div>
 
   return (
-    <div className="board-list">
+    <div>
       <h1>Boards</h1>
-      <ul>
+      <ul className="list-none p-0">
         {boards?.map((b) => (
-          <li key={b.id}>
-            <Link to="/board/$boardId" params={{ boardId: b.id }}>
+          <li
+            key={b.id}
+            className="flex gap-2.5 items-baseline py-2 border-b border-solid border-line"
+          >
+            <Link
+              to="/board/$boardId"
+              params={{ boardId: b.id }}
+              className="text-accent no-underline font-semibold hover:underline"
+            >
               {b.name}
             </Link>
             <span className="muted">

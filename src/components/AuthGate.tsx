@@ -13,12 +13,15 @@ function ConnectScreen() {
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const err = params?.get('authError')
   return (
-    <div className="connect">
-      <div className="connect-card">
-        <h1>jiracule</h1>
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="bg-surface border border-solid border-line rounded-[10px] shadow-card p-8 max-w-[360px] w-full text-center">
+        <h1 className="mt-0 mb-1 text-accent">jiracule</h1>
         <p className="muted">Connect your Jira account to continue.</p>
         {err && <p className="text-danger text-[13px]">{AUTH_ERRORS[err] ?? 'Sign-in failed.'}</p>}
-        <a className="primary connect-btn" href="/auth/login">
+        <a
+          className="inline-block mt-4 px-[18px] py-2.5 rounded-card no-underline bg-accent text-accent-fg font-semibold hover:brightness-105"
+          href="/auth/login"
+        >
           Connect Jira
         </a>
       </div>

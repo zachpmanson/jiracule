@@ -90,41 +90,6 @@ body {
   font-size: 12px;
 }
 
-/* --- connect / auth screen --- */
-.connect {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-.connect-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 32px;
-  max-width: 360px;
-  width: 100%;
-  text-align: center;
-}
-.connect-card h1 {
-  margin: 0 0 4px;
-  color: var(--accent);
-}
-.connect-btn {
-  display: inline-block;
-  margin-top: 16px;
-  padding: 10px 18px;
-  border-radius: var(--radius);
-  text-decoration: none;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-weight: 600;
-}
-.connect-btn:hover {
-  filter: brightness(1.05);
-}
 .logout {
   color: var(--muted);
   font-size: 13px;
@@ -213,27 +178,6 @@ button.primary {
   margin-bottom: 8px;
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border-radius: var(--radius);
-}
-
-/* --- board list (index) --- */
-.board-list ul {
-  list-style: none;
-  padding: 0;
-}
-.board-list li {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.board-list a {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-.board-list a:hover {
-  text-decoration: underline;
 }
 
 /* --- toolbar --- */
