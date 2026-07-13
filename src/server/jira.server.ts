@@ -5,6 +5,7 @@
 // bundle.
 import type {
   Assignee,
+  Attachment,
   Board,
   Column,
   Comment,
@@ -401,7 +402,7 @@ export async function getIssue(auth: JiraAuth, issueKey: string): Promise<Issue>
 }
 
 const DETAIL_FIELDS =
-  'summary,status,assignee,issuetype,priority,description,reporter,created,updated,labels,comment,parent,subtasks'
+  'summary,status,assignee,issuetype,priority,description,reporter,created,updated,labels,comment,parent,subtasks,attachment'
 
 interface RawPerson {
   accountId: string
@@ -444,6 +445,14 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
             updated?: string
           }>
         }
+        attachment?: Array<{
+          id: string
+          filename: string
+          mimeType?: string
+          size?: number
+          created?: string
+          author?: RawPerson
+        }>
       }
     }
   >(auth, 'GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${DETAIL_FIELDS}`)
@@ -464,6 +473,18 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
     created: c.created,
     updated: c.updated,
   }))
+  const attachments: Attachment[] = (f.attachment ?? []).map((a) => {
+    const mimeType = a.mimeType ?? 'application/octet-stream'
+    return {
+      id: a.id,
+      filename: a.filename,
+      mimeType,
+      size: a.size ?? 0,
+      created: a.created,
+      author: toAssignee(a.author),
+      isImage: mimeType.startsWith('image/'),
+    }
+  })
   return {
     ...base,
     description: adfToRich(f.description),
@@ -475,6 +496,7 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
     browseUrl: `${auth.siteUrl}/browse/${encodeURIComponent(issueKey)}`,
     comments,
     subtasks,
+    attachments,
     isSubtask: f.issuetype?.subtask ?? false,
   }
 }

@@ -14,6 +14,7 @@ import { Route as BoardBoardIdRouteImport } from './routes/board.$boardId'
 import { Route as AuthLogoutRouteImport } from './routes/auth.logout'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AttachmentIdRouteImport } from './routes/attachment.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,9 +41,15 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AttachmentIdRoute = AttachmentIdRouteImport.update({
+  id: '/attachment/$id',
+  path: '/attachment/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/attachment/$id': typeof AttachmentIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/attachment/$id': typeof AttachmentIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/attachment/$id': typeof AttachmentIdRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
@@ -66,13 +75,24 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/auth/callback' | '/auth/login' | '/auth/logout' | '/board/$boardId'
+    | '/'
+    | '/attachment/$id'
+    | '/auth/callback'
+    | '/auth/login'
+    | '/auth/logout'
+    | '/board/$boardId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/auth/callback' | '/auth/login' | '/auth/logout' | '/board/$boardId'
+    | '/'
+    | '/attachment/$id'
+    | '/auth/callback'
+    | '/auth/login'
+    | '/auth/logout'
+    | '/board/$boardId'
   id:
     | '__root__'
     | '/'
+    | '/attachment/$id'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
@@ -81,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AttachmentIdRoute: typeof AttachmentIdRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthLogoutRoute: typeof AuthLogoutRoute
@@ -124,11 +145,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/attachment/$id': {
+      id: '/attachment/$id'
+      path: '/attachment/$id'
+      fullPath: '/attachment/$id'
+      preLoaderRoute: typeof AttachmentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AttachmentIdRoute: AttachmentIdRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthLogoutRoute: AuthLogoutRoute,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { InlineSegment, SubtaskRef } from '../types'
+import type { Attachment, InlineSegment, SubtaskRef } from '../types'
+import { formatBytes } from '../util'
 import {
   useAddComment,
   useAssignableUsers,
@@ -182,6 +183,10 @@ export function IssueDetailModal({
                   canAdd={!issue.isSubtask}
                   onOpen={onOpen}
                 />
+
+                {issue.attachments.length > 0 && (
+                  <AttachmentSection attachments={issue.attachments} />
+                )}
 
                 <div className="section-label section-label-spaced">
                   Comments ({issue.comments.length})
@@ -452,6 +457,49 @@ function SubtaskSection({
           onClose={() => setAdding(false)}
         />
       )}
+    </>
+  )
+}
+
+// Read-only list of an issue's attachments. Images show a thumbnail (streamed
+// through the /attachment proxy); everything else shows a generic file glyph.
+// Clicking downloads the full file via the same proxy, using the anchor's
+// `download` attribute (same-origin) to preserve the original filename.
+function AttachmentSection({ attachments }: { attachments: Attachment[] }) {
+  return (
+    <>
+      <div className="section-label section-label-spaced">
+        Attachments ({attachments.length})
+      </div>
+      <ul className="attachments">
+        {attachments.map((a) => (
+          <li key={a.id}>
+            <a
+              className="attachment"
+              href={`/attachment/${a.id}`}
+              download={a.filename}
+              title={`Download ${a.filename}`}
+            >
+              {a.isImage ? (
+                <img
+                  className="attachment-thumb"
+                  src={`/attachment/${a.id}?thumb=1`}
+                  alt=""
+                  loading="lazy"
+                />
+              ) : (
+                <span className="attachment-thumb attachment-icon" aria-hidden="true">
+                  📄
+                </span>
+              )}
+              <span className="attachment-meta">
+                <span className="attachment-name">{a.filename}</span>
+                <span className="muted">{formatBytes(a.size)}</span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
     </>
   )
 }

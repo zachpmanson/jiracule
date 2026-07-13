@@ -88,6 +88,19 @@ export interface SubtaskRef {
   assignee?: Assignee
 }
 
+// An issue-level attachment. Binary content is never exposed to the browser
+// directly; the UI streams it through the `/attachment/$id` proxy route, so this
+// carries only metadata. `isImage` gates thumbnail rendering.
+export interface Attachment {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  created?: string
+  author?: Assignee
+  isImage: boolean
+}
+
 export interface IssueDetail extends Issue {
   description: InlineSegment[]
   reporter?: Assignee
@@ -97,6 +110,7 @@ export interface IssueDetail extends Issue {
   browseUrl?: string
   comments: Comment[]
   subtasks: SubtaskRef[]
+  attachments: Attachment[]
   // Whether this issue is itself a subtask type (subtasks can't be nested, so the
   // UI hides the "add subtask" affordance for these).
   isSubtask: boolean
