@@ -21,7 +21,7 @@ import {
   useUpdatePriority,
   useUpdateSummary,
 } from '../queries'
-import { Person } from './Avatar'
+import { Avatar, Person } from './Avatar'
 import { InlineEditor } from './InlineEditor'
 import { InlineError } from './InlineError'
 import { RichText } from './Linkified'
@@ -507,26 +507,38 @@ function SubtaskRow({
   return (
     <div className="subtask-row">
       <div className="subtask-card">
+        <div className="subtask-line1">
+          <button
+            type="button"
+            className="subtask-open"
+            onClick={() => onOpen?.(subtask.key)}
+            title={subtask.summary || subtask.key}
+          >
+            {subtask.issueTypeIconUrl && (
+              <img src={subtask.issueTypeIconUrl} alt="" className="type-icon" />
+            )}
+            <span className="card-key">{subtask.key}</span>
+          </button>
+          <div className="subtask-meta">
+            {subtask.assignee && <Avatar person={subtask.assignee} size="sm" />}
+            <StatusSelect
+              statusName={subtask.statusName}
+              transitions={transitions}
+              pending={transition.isPending}
+              error={transition.error}
+              onSelect={(id) => transition.mutate(id)}
+              className="subtask-status"
+            />
+          </div>
+        </div>
         <button
           type="button"
-          className="subtask-open"
+          className="subtask-title"
           onClick={() => onOpen?.(subtask.key)}
           title={subtask.summary || subtask.key}
         >
-          {subtask.issueTypeIconUrl && (
-            <img src={subtask.issueTypeIconUrl} alt="" className="type-icon" />
-          )}
-          <span className="card-key">{subtask.key}</span>
-          <span className="subtask-summary">{subtask.summary}</span>
+          {subtask.summary}
         </button>
-        <StatusSelect
-          statusName={subtask.statusName}
-          transitions={transitions}
-          pending={transition.isPending}
-          error={transition.error}
-          onSelect={(id) => transition.mutate(id)}
-          className="subtask-status"
-        />
       </div>
       <button
         className="icon-btn"
