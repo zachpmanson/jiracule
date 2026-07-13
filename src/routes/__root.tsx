@@ -11,10 +11,16 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'jiracule' },
+      {
+        name: 'description',
+        content: 'A fast, lightweight board for viewing and updating Jira issues.',
+      },
+      { name: 'theme-color', content: '#0052cc' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'manifest', href: '/manifest.json' },
     ],
   }),
   shellComponent: RootDocument,
