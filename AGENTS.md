@@ -40,11 +40,21 @@ lane refetches are also re-run after `RECONCILE_DELAY_MS`.
 
 - **Package manager: pnpm** (declared in `package.json` `packageManager`). Use
   `pnpm`, never `npm`/`yarn`.
-- **Styling: plain hand-written CSS** in a single global stylesheet,
-  `src/styles.css` (imported once via `?url` in `src/routes/__root.tsx`). No
-  Tailwind / CSS-in-JS. Theme via CSS custom properties on `:root`, with a
-  `prefers-color-scheme: dark` override. Add rules to the relevant
-  `/* --- section --- */` and reference by `className`.
+- **Styling: migrating to Tailwind v4 (hybrid, in progress).** `src/styles.css`
+  (imported via `?url` in `src/routes/__root.tsx`) imports Tailwind's theme +
+  utilities layers but **omits Preflight**, so the remaining hand-written rules
+  render unchanged while utilities are adopted component by component. Design
+  tokens are CSS custom properties on `:root` (swapped under
+  `prefers-color-scheme: dark`) mapped into Tailwind via `@theme` — so utilities
+  like `bg-surface`, `text-muted`, `border-line`, `rounded-card` resolve through
+  the same variables and **dark mode is automatic (no `dark:` variants)**. When
+  migrating a component, use utilities and delete its old `/* --- section --- */`
+  from `styles.css`. Keep `@theme`, `@keyframes`, and base-layer rules in CSS.
+- **Adding a dependency changes `pnpm-lock.yaml`, so `nix/package.nix`'s
+  `pnpmDeps` hash must be updated** or `make deploy` fails. The deploy build
+  prints the correct hash on mismatch (local `nix build` may OOM fetching all
+  platform binaries; the hash is platform-independent, so naboo's value is
+  canonical) — paste it into `nix/package.nix` and redeploy.
 - **Text-field save shortcuts:** single-line fields save on Enter; multi-line
   fields save on Cmd/Ctrl+Enter (see `InlineEditor`'s `singleLine` prop).
 - **Deploy:** `make deploy` — pushes the current branch and rebuilds the
