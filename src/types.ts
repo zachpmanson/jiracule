@@ -27,10 +27,14 @@ export interface StatusRef {
 export interface Column {
   name: string
   statusIds: string[]
-  // Named statuses within the column. When more than one, the UI renders them as
-  // stacked lanes (e.g. a "Done" column holding both Done and Abandoned). Absent
-  // for Agile boards, whose columns pool their mapped statuses without stacking.
+  // Named statuses the column incorporates. For a stacked column (pooled: falsy)
+  // the UI renders one labeled lane per status (e.g. a "Done" column holding both
+  // Done and Abandoned). For a pooled column they instead surface as chips in the
+  // header. May be absent when names couldn't be resolved.
   statuses?: StatusRef[]
+  // True for Agile columns, which pool their mapped statuses into a single lane
+  // (as Jira renders them) rather than stacking one lane per status.
+  pooled?: boolean
 }
 
 export interface Assignee {

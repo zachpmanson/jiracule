@@ -351,7 +351,8 @@ button.search-item:hover {
 .column-header {
   flex: 0 0 auto;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
@@ -359,10 +360,30 @@ button.search-item:hover {
   letter-spacing: 0.04em;
   color: var(--muted);
 }
+.column-header-top {
+  display: flex;
+  justify-content: space-between;
+}
 .column-header .count {
   background: var(--border);
   border-radius: 10px;
   padding: 0 8px;
+}
+/* Statuses a pooled (Agile) column incorporates, shown as chips under its name. */
+.column-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.column-statuses .status-chip {
+  background: var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--muted);
 }
 .column-body {
   flex: 1;

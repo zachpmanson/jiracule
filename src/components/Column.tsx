@@ -111,10 +111,19 @@ export function Column({
   onDelete: (key: string) => void
   onOpen: (key: string) => void
 }) {
-  // Stack lanes only when the column exposes more than one named status
+  // Stack lanes only when a non-pooled column exposes more than one named status
   // (Jira Work Management). Otherwise render one pooled lane whose drop target is
   // the column's primary status (Agile columns / single-status columns).
-  const stacked = (column.statuses?.length ?? 0) > 1
+  const stacked = !column.pooled && (column.statuses?.length ?? 0) > 1
+
+  // For a pooled column, surface the statuses it incorporates as header chips —
+  // its name often differs from (and hides) the statuses mapped into it. Skip a
+  // lone status whose name just repeats the column name (no new information).
+  const pooledNames = column.pooled ? (column.statuses?.map((s) => s.name) ?? []) : []
+  const statusChips =
+    pooledNames.length === 1 && pooledNames[0].toLowerCase() === column.name.toLowerCase()
+      ? []
+      : pooledNames
 
   // Each lane reports its total; the header shows their sum (… until known).
   const [totals, setTotals] = useState<Record<string, number | null>>({})
@@ -127,8 +136,19 @@ export function Column({
   return (
     <div className="column">
       <div className="column-header">
-        <span>{column.name}</span>
-        <span className="count">{columnTotal ?? '…'}</span>
+        <div className="column-header-top">
+          <span>{column.name}</span>
+          <span className="count">{columnTotal ?? '…'}</span>
+        </div>
+        {statusChips.length > 0 && (
+          <div className="column-statuses">
+            {statusChips.map((name) => (
+              <span key={name} className="status-chip">
+                {name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="column-body">
         {stacked ? (

@@ -188,22 +188,68 @@ export async function boardColumns(auth: JiraAuth, boardKey: string): Promise<Co
   const { kind, id } = parseBoardKey(boardKey)
   if (kind === 'agile') return agileColumns(auth, id)
 
+  // The project's workflow statuses double as an id→name map so pooled Agile
+  // columns can label the statuses they incorporate, and as the source for the
+  // status-category fallback — so fetch them once and share.
+  const statuses = await projectStatuses(auth, id)
+  const names = new Map(statuses.map((s) => [s.id, s.name]))
+
   // A project's Agile board (when it has one and our token can reach it) gives
   // the authoritative side-by-side column layout. Fall back to the status-category
   // heuristic for non-software projects, or when the Agile API rejects our token.
-  const agile = await agileColumnsForProject(auth, id)
-  return agile ?? projectColumns(auth, id)
+  const agile = await agileColumnsForProject(auth, id, names)
+  return agile ?? projectColumns(statuses)
+}
+
+type ProjectStatus = { id: string; name: string; statusCategory?: { key: string; name: string } }
+
+// projectStatuses returns a project's distinct workflow statuses (id, name,
+// category), preserving first-seen (workflow) order across issue types.
+async function projectStatuses(auth: JiraAuth, projectId: string): Promise<ProjectStatus[]> {
+  const r = await jiraFetch<Array<{ statuses: ProjectStatus[] }>>(
+    auth,
+    'GET',
+    `/rest/api/3/project/${encodeURIComponent(projectId)}/statuses`,
+  )
+  const out: ProjectStatus[] = []
+  const seen = new Set<string>()
+  for (const issueType of r ?? [])
+    for (const s of issueType.statuses)
+      if (!seen.has(s.id)) {
+        seen.add(s.id)
+        out.push(s)
+      }
+  return out
 }
 
 // agileColumns maps an Agile board's column configuration into our Column shape.
 // Statuses mapped into one column are pooled into a single lane (as Jira renders
-// them), so no `statuses` field is set — the column drops onto its first status.
-async function agileColumns(auth: JiraAuth, boardId: string): Promise<Column[]> {
+// them), so the column is marked `pooled` and drops onto its first status. The
+// config only carries status ids; `names` (when supplied) resolves them so the
+// header can show which statuses the column incorporates.
+async function agileColumns(
+  auth: JiraAuth,
+  boardId: string,
+  names?: Map<string, string>,
+): Promise<Column[]> {
   const r = await jiraFetch<{
     columnConfig: { columns: Array<{ name: string; statuses: Array<{ id: string }> }> }
   }>(auth, 'GET', `/rest/agile/1.0/board/${boardId}/configuration`)
   return (r!.columnConfig.columns ?? [])
-    .map((c) => ({ name: c.name, statusIds: c.statuses.map((s) => s.id) }))
+    .map((c) => {
+      const statusIds = c.statuses.map((s) => s.id)
+      const resolved = names
+        ? statusIds
+            .map((id) => ({ id, name: names.get(id) }))
+            .filter((s): s is StatusRef => s.name != null)
+        : []
+      return {
+        name: c.name,
+        statusIds,
+        statuses: resolved.length ? resolved : undefined,
+        pooled: true,
+      }
+    })
     .filter((c) => c.statusIds.length > 0) // drop unmapped columns (e.g. Backlog)
 }
 
@@ -213,6 +259,7 @@ async function agileColumns(auth: JiraAuth, boardId: string): Promise<Column[]> 
 async function agileColumnsForProject(
   auth: JiraAuth,
   projectId: string,
+  names?: Map<string, string>,
 ): Promise<Column[] | null> {
   try {
     const list = await jiraFetch<{
@@ -227,7 +274,7 @@ async function agileColumnsForProject(
     // project (e.g. a multi-project board); prefer one actually located in it.
     const board = boards.find((b) => String(b.location?.projectId) === projectId) ?? boards[0]
     if (!board) return null
-    const cols = await agileColumns(auth, String(board.id))
+    const cols = await agileColumns(auth, String(board.id), names)
     return cols.length ? cols : null
   } catch (e) {
     if (e instanceof JiraError) return null
@@ -236,35 +283,20 @@ async function agileColumnsForProject(
 }
 
 // projectColumns derives columns from a project's workflow statuses (there is no
-// Agile column config for non-software projects). Each distinct status becomes a
-// one-status column, preserving first-seen (workflow) order across issue types.
-async function projectColumns(auth: JiraAuth, projectId: string): Promise<Column[]> {
-  const r = await jiraFetch<
-    Array<{
-      statuses: Array<{
-        id: string
-        name: string
-        statusCategory?: { key: string; name: string }
-      }>
-    }>
-  >(auth, 'GET', `/rest/api/3/project/${encodeURIComponent(projectId)}/statuses`)
-
+// Agile column config for non-software projects). Statuses are grouped by status
+// category into one column each, stacked as lanes within the column.
+function projectColumns(statuses: ProjectStatus[]): Column[] {
   // Jira Work Management boards use one column per status *category*
   // (To Do → In Progress → Done); statuses in the same category are stacked as
   // lanes within that column (e.g. Done + Abandoned both under "Done").
   const categoryRank: Record<string, number> = { new: 0, indeterminate: 1, done: 2 }
   type Cat = { key: string; name: string; statuses: StatusRef[] }
   const byCategory = new Map<string, Cat>()
-  const seen = new Set<string>()
-  for (const issueType of r ?? []) {
-    for (const s of issueType.statuses) {
-      if (seen.has(s.id)) continue
-      seen.add(s.id)
-      const key = s.statusCategory?.key ?? 'indeterminate'
-      const name = s.statusCategory?.name ?? 'In Progress'
-      if (!byCategory.has(key)) byCategory.set(key, { key, name, statuses: [] })
-      byCategory.get(key)!.statuses.push({ id: s.id, name: s.name })
-    }
+  for (const s of statuses) {
+    const key = s.statusCategory?.key ?? 'indeterminate'
+    const name = s.statusCategory?.name ?? 'In Progress'
+    if (!byCategory.has(key)) byCategory.set(key, { key, name, statuses: [] })
+    byCategory.get(key)!.statuses.push({ id: s.id, name: s.name })
   }
   return [...byCategory.values()]
     .sort((a, b) => (categoryRank[a.key] ?? 1) - (categoryRank[b.key] ?? 1))
