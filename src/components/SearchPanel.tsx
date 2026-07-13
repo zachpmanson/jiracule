@@ -22,6 +22,9 @@ export function SearchPanel({
   onOpen: (issueKey: string) => void
 }) {
   const [input, setInput] = useState(q)
+  // Results only show while the search box (input, clear, or a result) holds
+  // focus, so the dropdown doesn't linger over the board after you move away.
+  const [focused, setFocused] = useState(false)
 
   // Reflect external resets of the committed query into the box.
   useEffect(() => setInput(q), [q])
@@ -34,10 +37,18 @@ export function SearchPanel({
   }, [input, q, onQueryChange])
 
   const { data: results, isFetching, error } = useSearch(q, boardId, jql)
-  const open = q.trim().length > 0
+  const open = focused && q.trim().length > 0
 
   return (
-    <div className="search">
+    <div
+      className="search"
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        // Keep open while focus stays within the search box (moving to the clear
+        // button or a result); close once it leaves entirely.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
+      }}
+    >
       <div className="search-box">
         <input
           type="search"

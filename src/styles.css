@@ -7,6 +7,7 @@
   --accent: #0052cc;
   --accent-text: #fff;
   --danger: #de350b;
+  --good: #36b37e;
   --col-bg: #ebecf0;
   --radius: 6px;
   --shadow: 0 1px 2px rgba(9, 30, 66, 0.15);
@@ -22,6 +23,7 @@
     --accent: #579dff;
     --accent-text: #1d2125;
     --danger: #ff6b5e;
+    --good: #57d9a3;
     --col-bg: #161a1d;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
@@ -479,6 +481,11 @@ button.search-item:hover {
   padding: 10px;
   margin-bottom: 8px;
   cursor: grab;
+}
+/* A card matching the active search is ringed green (box-shadow, not outline, so
+   it follows the border radius and doesn't shift layout). */
+.card.search-hit {
+  box-shadow: 0 0 0 2px var(--good), var(--shadow);
 }
 .card.dragging-source {
   opacity: 0.4;
@@ -970,6 +977,7 @@ button.subtask-title {
 .subtask-composer-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
   margin-top: 6px;
 }

@@ -1,7 +1,13 @@
+import { createContext, useContext } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import type { QueryKey } from '@tanstack/react-query'
 import type { Issue } from '../types'
 import { Avatar } from './Avatar'
+
+// Keys of issues matched by the active board search. Cards whose key is in this
+// set are ringed on the board so search hits are visible in context. Empty when
+// there's no active query.
+export const SearchHitContext = createContext<Set<string>>(new Set())
 
 // Shared visual content for both the in-column card and the drag overlay.
 function CardInner({ issue }: { issue: Issue }) {
@@ -36,6 +42,7 @@ export function Card({
     id: issue.key,
     data: { issue, sourceKey },
   })
+  const isSearchHit = useContext(SearchHitContext).has(issue.key)
 
   // No in-place transform: the moving copy is rendered in a DragOverlay so it
   // floats above the scroll containers instead of being clipped by them. The
@@ -43,7 +50,7 @@ export function Card({
   return (
     <div
       ref={setNodeRef}
-      className={`card${isDragging ? ' dragging-source' : ''}`}
+      className={`card${isDragging ? ' dragging-source' : ''}${isSearchHit ? ' search-hit' : ''}`}
       onClick={() => onOpen(issue.key)}
       {...attributes}
       {...listeners}

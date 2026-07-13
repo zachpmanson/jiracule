@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
 import {
   useBoardAssignees,
@@ -6,8 +6,10 @@ import {
   useBoards,
   useDeleteIssue,
   useMe,
+  useSearch,
 } from '../queries'
 import { Board } from './Board'
+import { SearchHitContext } from './Card'
 import { CreateIssueDialog } from './CreateIssueDialog'
 import { InlineError } from './InlineError'
 import { IssueDetailModal } from './IssueDetailModal'
@@ -66,6 +68,15 @@ export function BoardPage() {
 
   const assignees = assigneesQ.data ?? []
 
+  // Result keys of the active search (shares the panel's cached query). Cards on
+  // the board whose key matches are ringed green — visible only for the results
+  // that happen to be on the board.
+  const searchResults = useSearch(query, boardId, jqlMode)
+  const searchHits = useMemo(
+    () => new Set((searchResults.data ?? []).map((i) => i.key)),
+    [searchResults.data],
+  )
+
   function handleDelete(key: string) {
     if (window.confirm(`Delete ${key}? This cannot be undone.`)) del.mutate(key)
   }
@@ -100,13 +111,15 @@ export function BoardPage() {
         </button>
       </div>
 
-      <Board
-        boardId={boardId}
-        columns={columnsQ.data ?? []}
-        assigneeId={assigneeId}
-        onDelete={handleDelete}
-        onOpen={setOpenIssueKey}
-      />
+      <SearchHitContext.Provider value={searchHits}>
+        <Board
+          boardId={boardId}
+          columns={columnsQ.data ?? []}
+          assigneeId={assigneeId}
+          onDelete={handleDelete}
+          onOpen={setOpenIssueKey}
+        />
+      </SearchHitContext.Provider>
 
       {creating && (
         <CreateIssueDialog
