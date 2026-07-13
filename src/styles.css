@@ -85,10 +85,6 @@ body {
   overflow: hidden;
 }
 
-.spacer {
-  flex: 1;
-}
-
 .muted {
   color: var(--muted);
   font-size: 12px;
@@ -137,22 +133,6 @@ body {
   color: var(--text);
 }
 
-/* --- top bar --- */
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-
-.brand {
-  font-weight: 700;
-  font-size: 16px;
-  cursor: pointer;
-  color: var(--accent);
-}
 
 select,
 input,
@@ -188,13 +168,6 @@ button.primary {
   color: var(--accent-text);
   border-color: transparent;
   font-weight: 600;
-}
-
-.me {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
 }
 
 /* --- content --- */

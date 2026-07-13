@@ -10,8 +10,11 @@ export function Header() {
   const { data: me } = useMe()
 
   return (
-    <header className="topbar">
-      <div className="brand" onClick={() => navigate({ to: '/' })}>
+    <header className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-solid border-line">
+      <div
+        className="font-bold text-base cursor-pointer text-accent"
+        onClick={() => navigate({ to: '/' })}
+      >
         jiracule
       </div>
       <select
@@ -32,9 +35,9 @@ export function Header() {
           </option>
         ))}
       </select>
-      <div className="spacer" />
+      <div className="flex-1" />
       {me && (
-        <div className="me" title={me.email ?? me.displayName}>
+        <div className="flex items-center gap-1.5 text-[13px]" title={me.email ?? me.displayName}>
           <Avatar person={me} />
           <span>{me.displayName}</span>
         </div>

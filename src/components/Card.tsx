@@ -18,7 +18,7 @@ function CardInner({ issue }: { issue: Issue }) {
         {issue.issueTypeIconUrl && <img src={issue.issueTypeIconUrl} alt="" className="type-icon" />}
         <span className="card-key">{issue.key}</span>
         {issue.priority && <span className="priority">{issue.priority}</span>}
-        <div className="spacer" />
+        <div className="flex-1" />
         {issue.assignee && <Avatar person={issue.assignee} size="sm" />}
       </div>
     </>

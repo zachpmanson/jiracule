@@ -368,7 +368,7 @@ export function IssueDetailModal({
                   Open in Jira ↗
                 </a>
               )}
-              <div className="spacer" />
+              <div className="flex-1" />
               <button
                 className="danger"
                 onClick={() => {
