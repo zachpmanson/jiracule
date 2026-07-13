@@ -615,15 +615,15 @@ function SubtaskComposer({
       />
       <InlineError error={create.error} />
       <div className="subtask-composer-actions">
+        <button className="link-btn" disabled={create.isPending} onClick={onClose}>
+          Cancel
+        </button>
         <button
           className="primary"
           disabled={create.isPending || !summary.trim() || !subtaskType}
           onClick={submit}
         >
           {create.isPending ? 'Adding…' : 'Add'}
-        </button>
-        <button className="link-btn" disabled={create.isPending} onClick={onClose}>
-          Cancel
         </button>
       </div>
     </div>
