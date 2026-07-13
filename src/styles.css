@@ -637,7 +637,8 @@ button.search-item:hover {
   border-radius: 10px;
   padding: 2px 10px;
 }
-.status-select {
+.status-select,
+.assignee-select {
   font-size: 12px;
   font-weight: 600;
   padding: 2px 8px;
