@@ -482,10 +482,12 @@ button.search-item:hover {
   margin-bottom: 8px;
   cursor: grab;
 }
-/* A card matching the active search is ringed green (box-shadow, not outline, so
-   it follows the border radius and doesn't shift layout). */
+/* A card matching the active search is ringed green. The ring is an *inset*
+   shadow so it's painted inside the card's box — an outset ring/outline would be
+   clipped on the left/right by the lane's `overflow: auto` (cards sit flush to
+   the lane edges, with no horizontal gutter to bleed into). */
 .card.search-hit {
-  box-shadow: 0 0 0 2px var(--good), var(--shadow);
+  box-shadow: inset 0 0 0 2px var(--good), var(--shadow);
 }
 .card.dragging-source {
   opacity: 0.4;
