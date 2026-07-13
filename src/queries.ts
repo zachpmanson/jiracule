@@ -227,17 +227,23 @@ export function useBoardAssignees(projectKey: string) {
   })
 }
 
+// Jira's /search/jql index lags a just-created issue by several seconds —
+// longer than it lags a transition, and often past a single RECONCILE_DELAY_MS
+// window — so one delayed refetch can miss the new card entirely and the column
+// never updates until a manual reload. Refetch now, then a few more times with
+// backoff, so a newly created issue/subtask reliably lands in its column.
+const CREATE_RECONCILE_DELAYS_MS = [1200, 3000, 6000]
+function reconcileNewIssue(qc: ReturnType<typeof useQueryClient>, boardId: string) {
+  qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+  for (const delay of CREATE_RECONCILE_DELAYS_MS)
+    setTimeout(() => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }), delay)
+}
+
 export function useCreateIssue(boardId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateIssueInput) => createIssue({ data: input }),
-    // Refresh the board now, then again after the index catches up: Jira's
-    // /search/jql is eventually consistent, so an immediate refetch can miss the
-    // just-created issue (same lag the move mutation reconciles around).
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
-      setTimeout(() => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }), RECONCILE_DELAY_MS)
-    },
+    onSuccess: () => reconcileNewIssue(qc, boardId),
   })
 }
 
@@ -260,10 +266,7 @@ export function useCreateSubtask(parentKey: string, boardId?: string) {
     mutationFn: (input: CreateIssueInput) => createIssue({ data: { ...input, parentKey } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.issue(parentKey) })
-      if (boardId) {
-        qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
-        setTimeout(() => qc.invalidateQueries({ queryKey: keys.lanes(boardId) }), RECONCILE_DELAY_MS)
-      }
+      if (boardId) reconcileNewIssue(qc, boardId)
     },
   })
 }
