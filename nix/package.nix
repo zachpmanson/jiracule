@@ -7,7 +7,7 @@ let
     src = ../.;
     fetcherVersion = 3;
     # Update on lockfile changes: `nix build` prints the expected hash on mismatch.
-    hash = "sha256-L4ryK1o6iMKEk7M8jS3T7FD2v3mAgwKdERBAXAorGPM=";
+    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
 in
 

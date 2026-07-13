@@ -1,3 +1,32 @@
+/* Tailwind v4 (hybrid migration). We import only the theme + utilities layers and
+   deliberately OMIT Preflight: the hand-written rules below were authored against
+   browser defaults, so pulling in Tailwind's reset would change baseline styling.
+   Utilities are available now; Preflight can be adopted once styles.css is gone. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Map the app's design tokens (the CSS variables in :root below, swapped under
+   prefers-color-scheme) onto Tailwind theme tokens, so utilities like bg-surface,
+   text-muted, border-line resolve through the SAME variables — dark mode stays
+   automatic and needs no dark: variants. Existing CSS keeps using var(--bg) etc.
+   unchanged; these are the names the migrated markup will use. */
+@theme {
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-text);
+  --color-danger: var(--danger);
+  --color-good: var(--good);
+  --color-column: var(--col-bg);
+
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow);
+}
+
 :root {
   --bg: #f4f5f7;
   --surface: #ffffff;
