@@ -458,14 +458,12 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
   >(auth, 'GET', `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${DETAIL_FIELDS}`)
   const base = toIssue(ri!)
   const f = ri!.fields
-  const subtasks: SubtaskRef[] = (f.subtasks ?? []).map((s) => ({
-    key: s.key,
-    summary: s.fields?.summary ?? '',
-    statusId: s.fields?.status?.id ?? '',
-    statusName: s.fields?.status?.name ?? '',
-    issueTypeIconUrl: s.fields?.issuetype?.iconUrl,
-    assignee: toAssignee(s.fields?.assignee),
-  }))
+  // The parent's embedded `subtasks` field has no priority/creation ordering, so
+  // when there's more than one to order, re-fetch them via JQL (Jira applies its
+  // own priority sequence natively). A single subtask needs no sorting.
+  const embeddedSubtasks: SubtaskRef[] = (f.subtasks ?? []).map(toSubtaskRef)
+  const subtasks =
+    embeddedSubtasks.length > 1 ? await orderedSubtasks(auth, issueKey) : embeddedSubtasks
   const comments: Comment[] = (f.comment?.comments ?? []).map((c) => ({
     id: c.id,
     author: toAssignee(c.author),
@@ -499,6 +497,41 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
     attachments,
     isSubtask: f.issuetype?.subtask ?? false,
   }
+}
+
+// The subset of a subtask's fields we surface, as returned both by a parent's
+// embedded `subtasks` field and by a JQL search over its children.
+interface RawSubtask {
+  key: string
+  fields?: {
+    summary?: string
+    status?: { id: string; name: string }
+    issuetype?: { iconUrl?: string }
+    assignee?: RawPerson
+  }
+}
+
+function toSubtaskRef(s: RawSubtask): SubtaskRef {
+  return {
+    key: s.key,
+    summary: s.fields?.summary ?? '',
+    statusId: s.fields?.status?.id ?? '',
+    statusName: s.fields?.status?.name ?? '',
+    issueTypeIconUrl: s.fields?.issuetype?.iconUrl,
+    assignee: toAssignee(s.fields?.assignee),
+  }
+}
+
+// orderedSubtasks lists a parent's subtasks ordered by priority then creation —
+// an ordering the embedded `subtasks` field can't express, so we ask Jira for it
+// directly via JQL.
+async function orderedSubtasks(auth: JiraAuth, parentKey: string): Promise<SubtaskRef[]> {
+  const r = await jiraFetch<{ issues: RawSubtask[] }>(auth, 'POST', '/rest/api/3/search/jql', {
+    jql: `parent = "${parentKey}" ORDER BY priority DESC, created ASC`,
+    fields: ['summary', 'status', 'issuetype', 'assignee'],
+    maxResults: 100,
+  })
+  return (r?.issues ?? []).map(toSubtaskRef)
 }
 
 // projectIssueTypes lists a project's issue types, tagged with whether each is a
