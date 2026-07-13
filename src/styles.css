@@ -137,6 +137,19 @@ button {
   padding: 6px 8px;
 }
 
+/* Focus indication for form controls: an accent border + inset ring instead of
+   the browser's outset outline. The outline is painted outside the box and gets
+   clipped on the flush left/right edges by overflow containers (scrolling lanes,
+   the scrolling modal panes holding the description/comment editors); a border
+   and inset shadow stay within the box, so they're always fully visible. */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 button {
   cursor: pointer;
 }
