@@ -27,6 +27,21 @@
   --shadow-card: var(--shadow);
 }
 
+/* Minimal border reset (the one piece of Preflight we need, since it's omitted):
+   default every element's border-width to 0 with a solid style, so directional
+   border utilities like `border-b` show ONLY that side. Without this, `border-b`
+   sets the bottom width but the other sides keep the CSS-default `medium` width
+   and render a full box. Hand-written rules that use the `border` shorthand set
+   their own width, so they're unaffected. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-width: 0;
+    border-style: solid;
+  }
+}
+
 :root {
   --bg: #f4f5f7;
   --surface: #ffffff;
