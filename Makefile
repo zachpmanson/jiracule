@@ -5,4 +5,4 @@
 # then on the server bumps the jiracule flake input and rebuilds.
 deploy:
 	git push origin HEAD
-	ssh nc 'cd nixos-config && nix flake lock --update-input jiracule && sudo nixos-rebuild switch --flake .#naboo'
+	ssh nc 'cd nixos-config && nix flake lock --update-input jiracule && rebuild'

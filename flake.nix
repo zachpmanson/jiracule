@@ -13,7 +13,7 @@
         packages.default = pkgs.callPackage ./nix/package.nix {};
 
         devShells.default = pkgs.mkShell {
-          packages = [ pkgs.nodejs_24 pkgs.pnpm ];
+          packages = [ pkgs.nodejs_22 pkgs.pnpm ];
         };
       }) // {
       nixosModules.default = import ./nix/module.nix self;
