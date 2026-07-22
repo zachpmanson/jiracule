@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Assignee, Attachment, InlineSegment, SubtaskRef } from '../types'
 import { formatBytes } from '../util'
 import {
+  keys,
   useAddComment,
   useAssignableUsers,
   useCreateSubtask,
@@ -50,6 +52,7 @@ export function IssueDetailModal({
   onDelete: (key: string) => void
   onOpen?: (key: string) => void
 }) {
+  const qc = useQueryClient()
   const { data: issue, isLoading, error } = useIssueDetail(issueKey)
   const { data: transitions } = useIssueTransitions(issueKey)
   const { data: assignable } = useAssignableUsers(issueKey)
@@ -92,6 +95,17 @@ export function IssueDetailModal({
     if (!body) return
     addComment.mutate(body, { onSuccess: () => setCommentDraft('') })
   }
+
+  // Refetch this issue's detail when the window regains focus, so the open panel
+  // reflects changes made elsewhere (the board's focus-refetch is suppressed
+  // while a modal is open — see BoardPage).
+  useEffect(() => {
+    function onFocus() {
+      qc.invalidateQueries({ queryKey: keys.issue(issueKey) })
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [issueKey, qc])
 
   // Escape dismisses the modal — but first backs out of an inline editor if one
   // is open, so it doesn't discard an in-progress edit unexpectedly.

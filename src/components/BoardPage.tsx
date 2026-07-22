@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import {
+  keys,
   useBoardAssignees,
   useBoardColumns,
   useBoards,
@@ -25,6 +27,7 @@ export function BoardPage() {
   const { boardId } = routeApi.useParams()
   const search = routeApi.useSearch()
   const navigate = routeApi.useNavigate()
+  const qc = useQueryClient()
 
   const { data: me } = useMe()
   const { data: boards } = useBoards()
@@ -65,6 +68,29 @@ export function BoardPage() {
       document.title = 'jiracule'
     }
   }, [board?.name])
+
+  // While the detail modal is open it owns focus-refetching (see IssueDetailModal);
+  // the board only refetches on window focus when no modal is open. Refetches the
+  // lanes so cards reflect changes made in another tab/window while we were away.
+  useEffect(() => {
+    if (openIssueKey) return
+    function onFocus() {
+      qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [openIssueKey, boardId, qc])
+
+  // When the modal closes, refetch the lanes: the issue may have been edited in
+  // the panel (status/assignee/etc.) and the board's focus-refetch was suppressed
+  // while it was open. Only fires on the open→closed transition, not on mount.
+  const prevOpenIssueKey = useRef(openIssueKey)
+  useEffect(() => {
+    if (prevOpenIssueKey.current && !openIssueKey) {
+      qc.invalidateQueries({ queryKey: keys.lanes(boardId) })
+    }
+    prevOpenIssueKey.current = openIssueKey
+  }, [openIssueKey, boardId, qc])
 
   const assignees = assigneesQ.data ?? []
 
