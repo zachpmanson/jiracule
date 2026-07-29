@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { useBoards, useMe } from '../queries'
+import { groupByProject } from '../util'
 import { Avatar } from './Avatar'
 
 export function Header() {
@@ -49,11 +50,14 @@ export function Header() {
         <option value="" disabled>
           Select a board…
         </option>
-        {boards?.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-            {b.projectKey ? ` (${b.projectKey})` : ''}
-          </option>
+        {groupByProject(boards).map((g) => (
+          <optgroup key={g.name} label={g.name}>
+            {g.boards.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       <div className="flex-1" />

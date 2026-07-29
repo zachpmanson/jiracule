@@ -146,59 +146,119 @@ export async function myself(auth: JiraAuth): Promise<User> {
   }
 }
 
-// A board id is an opaque key that encodes its kind. Software Agile boards use
-// `agile-<boardId>`; non-software projects (e.g. Jira Work Management) have no
-// Agile board and are surfaced as `project-<projectId>` with status columns.
-type BoardKind = 'agile' | 'project'
+// A board id encodes its kind and the project it scopes to. A Software Agile
+// board is `agile-<boardId>-<projectId>`: the board supplies the column layout
+// while the project scopes the issue queries. A project with no Agile board is
+// `project-<projectId>`, surfaced with status-category columns. Both ids are
+// composed only of `agile`/`project` + numeric ids, so splitting on `-` is safe.
+type ParsedBoardKey =
+  | { kind: 'agile'; boardId: string; projectId: string }
+  | { kind: 'project'; projectId: string }
 
-function parseBoardKey(key: string): { kind: BoardKind; id: string } {
-  const idx = key.indexOf('-')
-  if (idx < 0) throw new JiraError(`invalid board id: ${key}`, 400)
-  return { kind: key.slice(0, idx) as BoardKind, id: key.slice(idx + 1) }
+function parseBoardKey(key: string): ParsedBoardKey {
+  const parts = key.split('-')
+  if (parts[0] === 'agile' && parts.length >= 3) {
+    return { kind: 'agile', boardId: parts[1], projectId: parts[2] }
+  }
+  if (parts[0] === 'project' && parts.length >= 2) {
+    return { kind: 'project', projectId: parts[1] }
+  }
+  throw new JiraError(`invalid board id: ${key}`, 400)
 }
 
-// Boards are enumerated from the project list (platform API), giving stable
-// `project-<id>` ids for URLs. The column *layout* is resolved separately in
-// boardColumns, which prefers the project's Agile board config and falls back to
-// a status-category heuristic. We list projects (not Agile boards) so every
-// project type appears even when it has no Agile board.
+// Boards for the switcher: every Agile board on the site, grouped under the
+// project it lives in, plus a `project-<id>` entry for projects that have no
+// Agile board. Enumerating boards (not just projects) means a project with
+// several boards exposes each of them, instead of collapsing to whichever one
+// resolves first. The column *layout* is resolved separately in boardColumns.
 export async function listBoards(auth: JiraAuth): Promise<Board[]> {
+  const projects = await listProjects(auth)
+  const boardsByProject = await agileBoardsByProject(auth)
   const out: Board[] = []
+  for (const p of projects) {
+    const boards = boardsByProject.get(p.id) ?? []
+    if (boards.length === 0) {
+      out.push({ id: `project-${p.id}`, name: p.name, type: p.type, projectKey: p.key, projectName: p.name })
+    } else {
+      for (const b of boards) {
+        out.push({
+          id: `agile-${b.id}-${p.id}`,
+          name: b.name,
+          type: b.type,
+          projectKey: p.key,
+          projectName: p.name,
+        })
+      }
+    }
+  }
+  return out
+}
+
+type ProjectInfo = { id: string; key: string; name: string; type: string }
+
+// listProjects enumerates the visible projects (platform API, paginated).
+async function listProjects(auth: JiraAuth): Promise<ProjectInfo[]> {
+  const out: ProjectInfo[] = []
   let startAt = 0
   for (;;) {
     const r = await jiraFetch<{
       isLast: boolean
       values: Array<{ id: string; key: string; name: string; projectTypeKey: string }>
     }>(auth, 'GET', `/rest/api/3/project/search?maxResults=50&startAt=${startAt}`)
-    for (const p of r!.values) {
-      out.push({
-        id: `project-${p.id}`,
-        name: p.name,
-        type: p.projectTypeKey,
-        projectKey: p.key,
-        projectName: p.name,
-      })
-    }
+    for (const p of r!.values) out.push({ id: p.id, key: p.key, name: p.name, type: p.projectTypeKey })
     if (r!.isLast || r!.values.length === 0) break
     startAt += r!.values.length
   }
   return out
 }
 
+type AgileBoardInfo = { id: number; name: string; type: string }
+
+// agileBoardsByProject lists every Agile board on the site, keyed by the id of
+// the project it is located in. Returns an empty map (so listBoards falls back
+// to project-only entries) if the Agile board API rejects our token.
+async function agileBoardsByProject(auth: JiraAuth): Promise<Map<string, AgileBoardInfo[]>> {
+  const byProject = new Map<string, AgileBoardInfo[]>()
+  try {
+    let startAt = 0
+    for (;;) {
+      const r = await jiraFetch<{
+        isLast: boolean
+        values: Array<{ id: number; name: string; type: string; location?: { projectId?: number } }>
+      }>(auth, 'GET', `/rest/agile/1.0/board?maxResults=50&startAt=${startAt}`)
+      for (const b of r!.values) {
+        const pid = b.location?.projectId
+        if (pid == null) continue
+        const k = String(pid)
+        if (!byProject.has(k)) byProject.set(k, [])
+        byProject.get(k)!.push({ id: b.id, name: b.name, type: b.type })
+      }
+      if (r!.isLast || r!.values.length === 0) break
+      startAt += r!.values.length
+    }
+  } catch (e) {
+    if (e instanceof JiraError) return new Map()
+    throw e
+  }
+  return byProject
+}
+
 export async function boardColumns(auth: JiraAuth, boardKey: string): Promise<Column[]> {
-  const { kind, id } = parseBoardKey(boardKey)
-  if (kind === 'agile') return agileColumns(auth, id)
+  const parsed = parseBoardKey(boardKey)
 
   // The project's workflow statuses double as an id→name map so pooled Agile
   // columns can label the statuses they incorporate, and as the source for the
   // status-category fallback — so fetch them once and share.
-  const statuses = await projectStatuses(auth, id)
+  const statuses = await projectStatuses(auth, parsed.projectId)
   const names = new Map(statuses.map((s) => [s.id, s.name]))
 
-  // A project's Agile board (when it has one and our token can reach it) gives
-  // the authoritative side-by-side column layout. Fall back to the status-category
-  // heuristic for non-software projects, or when the Agile API rejects our token.
-  const agile = await agileColumnsForProject(auth, id, names)
+  // A specific Agile board: use its configured columns directly.
+  if (parsed.kind === 'agile') return agileColumns(auth, parsed.boardId, names)
+
+  // A project with no Agile board of its own: prefer any Agile board located in
+  // it (authoritative side-by-side layout), else fall back to the status-category
+  // heuristic for non-software projects or when the Agile API rejects our token.
+  const agile = await agileColumnsForProject(auth, parsed.projectId, names)
   return agile ?? projectColumns(statuses)
 }
 
@@ -309,10 +369,11 @@ function projectColumns(statuses: ProjectStatus[]): Column[] {
 }
 
 // laneIssues fetches one page of a lane's issues. A lane targets one or more
-// statuses (an Agile column pools several); the board id is always `project-<id>`,
-// so we query by JQL and page with the search endpoint's opaque cursor. The
-// approximate total is fetched once, on the first page (cursor undefined), since
-// the /search/jql endpoint no longer returns `total`.
+// statuses (an Agile column pools several); the board key carries the project
+// it scopes to, so we query by JQL over that project and page with the search
+// endpoint's opaque cursor. The approximate total is fetched once, on the first
+// page (cursor undefined), since the /search/jql endpoint no longer returns
+// `total`.
 export async function laneIssues(
   auth: JiraAuth,
   boardKey: string,
@@ -320,7 +381,7 @@ export async function laneIssues(
   assigneeId?: string,
   cursor?: string,
 ): Promise<LanePage> {
-  const { id: projectId } = parseBoardKey(boardKey)
+  const { projectId } = parseBoardKey(boardKey)
   const clauses = [`project = ${projectId}`]
   if (statusIds.length) clauses.push(`status IN (${statusIds.join(',')})`)
   if (assigneeId) clauses.push(`assignee = "${jqlQuote(assigneeId)}"`)
