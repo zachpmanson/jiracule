@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BoardBoardIdRouteImport } from './routes/board.$boardId'
+import { Route as AuthTokenRouteImport } from './routes/auth.token'
 import { Route as AuthLogoutRouteImport } from './routes/auth.logout'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
@@ -24,6 +25,11 @@ const IndexRoute = IndexRouteImport.update({
 const BoardBoardIdRoute = BoardBoardIdRouteImport.update({
   id: '/board/$boardId',
   path: '/board/$boardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthTokenRoute = AuthTokenRouteImport.update({
+  id: '/auth/token',
+  path: '/auth/token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthLogoutRoute = AuthLogoutRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
+  '/auth/token': typeof AuthTokenRoute
   '/board/$boardId': typeof BoardBoardIdRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
+  '/auth/token': typeof AuthTokenRoute
   '/board/$boardId': typeof BoardBoardIdRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/logout': typeof AuthLogoutRoute
+  '/auth/token': typeof AuthTokenRoute
   '/board/$boardId': typeof BoardBoardIdRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
+    | '/auth/token'
     | '/board/$boardId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
+    | '/auth/token'
     | '/board/$boardId'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/login'
     | '/auth/logout'
+    | '/auth/token'
     | '/board/$boardId'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthLogoutRoute: typeof AuthLogoutRoute
+  AuthTokenRoute: typeof AuthTokenRoute
   BoardBoardIdRoute: typeof BoardBoardIdRoute
 }
 
@@ -122,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/board/$boardId'
       fullPath: '/board/$boardId'
       preLoaderRoute: typeof BoardBoardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/token': {
+      id: '/auth/token'
+      path: '/auth/token'
+      fullPath: '/auth/token'
+      preLoaderRoute: typeof AuthTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/logout': {
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthLogoutRoute: AuthLogoutRoute,
+  AuthTokenRoute: AuthTokenRoute,
   BoardBoardIdRoute: BoardBoardIdRoute,
 }
 export const routeTree = rootRouteImport
