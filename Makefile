@@ -15,5 +15,5 @@ clean:
 format:
 	pnpm lint
 
-deploy: build
-	rsync -r --delete .output/ jiracule:/
+deploy:
+	ssh jiracule
