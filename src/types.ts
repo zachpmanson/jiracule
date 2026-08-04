@@ -63,16 +63,11 @@ export interface LanePage {
   total: number | null
 }
 
-// A run of inline text; `href` set means it should render as a link.
-export interface InlineSegment {
-  text: string
-  href?: string
-}
-
 export interface Comment {
   id: string
   author?: Assignee
-  body: InlineSegment[]
+  // Markdown; see src/markdown.ts for the ADF ⇄ Markdown bridge.
+  body: string
   created?: string
   updated?: string
 }
@@ -102,7 +97,8 @@ export interface Attachment {
 }
 
 export interface IssueDetail extends Issue {
-  description: InlineSegment[]
+  // Markdown; see src/markdown.ts for the ADF ⇄ Markdown bridge.
+  description: string
   reporter?: Assignee
   labels: string[]
   created?: string

@@ -913,7 +913,6 @@ button.link-btn {
   cursor: pointer;
 }
 .detail-desc {
-  white-space: pre-wrap;
   background: var(--col-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -942,8 +941,76 @@ button.link-btn {
   margin-bottom: 4px;
 }
 .comment-body {
-  white-space: pre-wrap;
   font-size: 13px;
+}
+
+/* Rendered Markdown (issue descriptions + comments). Kept compact so block
+   elements sit tidily inside the panel; the first/last child never adds outer
+   margin so the surrounding padding stays even. */
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 8px;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.md h1 {
+  font-size: 16px;
+}
+.md h2 {
+  font-size: 15px;
+}
+.md ul,
+.md ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.md li {
+  margin: 2px 0;
+}
+.md pre {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-size: 12px;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--col-bg);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.md blockquote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+.md hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
 }
 .modal.detail .modal-actions {
   margin-top: auto; /* keep actions pinned to the bottom of the tall modal */

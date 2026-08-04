@@ -10,7 +10,6 @@ import type {
   Column,
   Comment,
   CreateIssueInput,
-  InlineSegment,
   Issue,
   IssueDetail,
   IssueTypeRef,
@@ -21,6 +20,7 @@ import type {
   User,
 } from '../types'
 import type { JiraAuth } from './session.server'
+import { markdownToAdf } from '../markdown'
 
 export type { JiraAuth }
 
@@ -528,7 +528,7 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
   const comments: Comment[] = (f.comment?.comments ?? []).map((c) => ({
     id: c.id,
     author: toAssignee(c.author),
-    body: adfToRich(c.body),
+    body: adfToMarkdown(c.body),
     created: c.created,
     updated: c.updated,
   }))
@@ -546,7 +546,7 @@ export async function getIssueDetail(auth: JiraAuth, issueKey: string): Promise<
   })
   return {
     ...base,
-    description: adfToRich(f.description),
+    description: adfToMarkdown(f.description),
     reporter: toAssignee(f.reporter),
     parent: f.parent ? { key: f.parent.key, summary: f.parent.fields?.summary } : undefined,
     labels: f.labels ?? [],
@@ -619,7 +619,7 @@ export async function createIssue(auth: JiraAuth, input: CreateIssueInput): Prom
     issuetype: { name: input.issueType },
     summary: input.summary,
   }
-  if (input.description) fields.description = adfDoc(input.description)
+  if (input.description) fields.description = markdownToAdf(input.description)
   if (input.assigneeId) fields.assignee = { accountId: input.assigneeId }
   if (input.parentKey) fields.parent = { key: input.parentKey }
   const r = await jiraFetch<{ key: string }>(auth, 'POST', '/rest/api/3/issue', { fields })
@@ -636,7 +636,7 @@ export async function updateIssueDescription(
   description: string,
 ): Promise<void> {
   await jiraFetch(auth, 'PUT', `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
-    fields: { description: adfDoc(description) },
+    fields: { description: markdownToAdf(description) },
   })
 }
 
@@ -729,7 +729,7 @@ export async function assignableUsers(auth: JiraAuth, issueKey: string): Promise
 
 export async function addComment(auth: JiraAuth, issueKey: string, body: string): Promise<void> {
   await jiraFetch(auth, 'POST', `/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
-    body: adfDoc(body),
+    body: markdownToAdf(body),
   })
 }
 
@@ -764,79 +764,129 @@ export function jqlQuote(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-// adfToRich flattens an Atlassian Document Format node tree into inline segments,
-// preserving link targets so the frontend can render link-marked text as an <a>
-// tag on the label itself. Newlines between block-level nodes are kept as text.
-function adfToRich(node: unknown): InlineSegment[] {
-  if (node == null || typeof node !== 'object') return []
-  // A paragraph/heading/etc. ends a block, so it's separated from the next block
-  // by a blank line; list items sit on consecutive lines (single newline).
-  const paragraphBreak = new Set(['paragraph', 'heading', 'blockquote', 'codeBlock'])
-  const lineBreak = new Set(['listItem'])
-  const out: InlineSegment[] = []
-  const push = (text: string, href?: string) => {
-    if (!text) return
-    out.push(href ? { text, href } : { text })
-  }
-  const walk = (n: any): void => {
-    if (!n || typeof n !== 'object') return
-    if (n.type === 'text') {
-      const text = typeof n.text === 'string' ? n.text : ''
-      const href = Array.isArray(n.marks)
-        ? n.marks.find((m: any) => m?.type === 'link')?.attrs?.href
-        : undefined
-      push(text, href)
-      return
-    }
-    if (n.type === 'hardBreak') return push('\n')
-    // Smart links / URL cards carry the URL in attrs, not as child text.
-    if (n.type === 'inlineCard' || n.type === 'blockCard') {
-      const url = n.attrs?.url
-      if (url) push(url, url)
-      return
-    }
-    const children: any[] = Array.isArray(n.content) ? n.content : []
-    children.forEach(walk)
-    if (paragraphBreak.has(n.type)) push('\n\n')
-    else if (lineBreak.has(n.type)) push('\n')
-  }
-  walk(node)
-  // Collapse adjacent newline-only segments and cap them at a single blank line
-  // (two newlines) so paragraph breaks show without stacking up.
-  const norm: InlineSegment[] = []
-  for (const seg of out) {
-    if (!seg.href && /^\n+$/.test(seg.text)) {
-      const prev = norm[norm.length - 1]
-      if (prev && !prev.href && /^\n+$/.test(prev.text)) {
-        prev.text = '\n'.repeat(Math.min(2, prev.text.length + seg.text.length))
-        continue
-      }
-      norm.push({ text: '\n'.repeat(Math.min(2, seg.text.length)) })
-      continue
-    }
-    norm.push(seg)
-  }
-  // Trim leading/trailing whitespace-only segments (e.g. the final block break).
-  while (norm.length && norm[0].text.trim() === '' && !norm[0].href) norm.shift()
-  while (norm.length && norm[norm.length - 1].text.trim() === '' && !norm[norm.length - 1].href)
-    norm.pop()
-  return norm
+// adfToMarkdown flattens an Atlassian Document Format node tree into a Markdown
+// string — the wire format the browser renders (Markdown.tsx) and edits, and
+// which markdownToAdf (../markdown) turns back into ADF on save. Inline marks
+// (bold/italic/code/strike/link) and block structure (headings, lists, code
+// blocks, quotes) are preserved so a read → edit → write round-trip keeps its
+// formatting instead of collapsing to plain text.
+function adfToMarkdown(node: unknown): string {
+  if (node == null || typeof node !== 'object') return ''
+  const blocks: any[] = Array.isArray((node as any).content) ? (node as any).content : []
+  return blocks
+    .map(blockToMarkdown)
+    .filter((s) => s.length > 0)
+    .join('\n\n')
+    .trim()
 }
 
-// adfDoc wraps plain text in a minimal Atlassian Document Format document, which
-// the v3 create-issue endpoint requires for rich-text fields like description.
-function adfDoc(text: string) {
-  // Mirror adfToRich: blank lines separate paragraphs, and single newlines
-  // within a paragraph become hard breaks. Empty text yields a single empty
-  // paragraph (valid ADF — an empty text node is not).
-  const content = text.split(/\n{2,}/).map((para) => {
-    const lines = para.split('\n')
-    const inline: unknown[] = []
-    lines.forEach((line, i) => {
-      if (i > 0) inline.push({ type: 'hardBreak' })
-      if (line) inline.push({ type: 'text', text: line })
-    })
-    return inline.length ? { type: 'paragraph', content: inline } : { type: 'paragraph' }
-  })
-  return { type: 'doc', version: 1, content }
+// Escape the characters that would otherwise be read back as Markdown syntax.
+// Underscores are deliberately left alone (see ../markdown), so identifiers like
+// snake_case survive untouched.
+function escapeMd(text: string): string {
+  return text.replace(/([\\`*[])/g, '\\$1').replace(/~~/g, '\\~\\~')
+}
+
+// inlineToMarkdown serialises a node's inline children, applying each text
+// node's marks as the matching Markdown delimiters.
+function inlineToMarkdown(content: any): string {
+  const nodes: any[] = Array.isArray(content) ? content : []
+  let out = ''
+  for (const n of nodes) {
+    if (!n || typeof n !== 'object') continue
+    if (n.type === 'hardBreak') {
+      out += '\n'
+      continue
+    }
+    if (n.type === 'inlineCard' || n.type === 'blockCard') {
+      const url = n.attrs?.url
+      if (url) out += url
+      continue
+    }
+    if (n.type === 'mention') {
+      out += escapeMd(n.attrs?.text ?? '')
+      continue
+    }
+    if (n.type === 'emoji') {
+      out += n.attrs?.text ?? n.attrs?.shortName ?? ''
+      continue
+    }
+    if (n.type !== 'text' || typeof n.text !== 'string') continue
+    const marks: any[] = Array.isArray(n.marks) ? n.marks : []
+    const has = (t: string) => marks.some((m) => m?.type === t)
+    const link = marks.find((m) => m?.type === 'link')
+    // Code text is verbatim (only its backticks matter); everything else is escaped.
+    let s = has('code') ? '`' + n.text + '`' : escapeMd(n.text)
+    if (!has('code')) {
+      if (has('strike')) s = `~~${s}~~`
+      if (has('em')) s = `*${s}*`
+      if (has('strong')) s = `**${s}**`
+    }
+    if (link?.attrs?.href) s = `[${s}](${link.attrs.href})`
+    out += s
+  }
+  return out
+}
+
+// Prefix a leading block marker on any paragraph line with a backslash so the
+// text isn't re-parsed as a heading/list/quote.
+function escapeLeadingMarkers(md: string): string {
+  return md.replace(/^(\s*)(#{1,6}\s|[-+>]\s|\d+[.)]\s)/gm, '$1\\$2')
+}
+
+function blockToMarkdown(n: any): string {
+  if (!n || typeof n !== 'object') return ''
+  switch (n.type) {
+    case 'paragraph':
+      return escapeLeadingMarkers(inlineToMarkdown(n.content))
+    case 'heading': {
+      const level = Math.min(6, Math.max(1, n.attrs?.level ?? 1))
+      return `${'#'.repeat(level)} ${inlineToMarkdown(n.content)}`
+    }
+    case 'bulletList':
+      return (Array.isArray(n.content) ? n.content : [])
+        .map((li: any) => `- ${listItemToMarkdown(li)}`)
+        .join('\n')
+    case 'orderedList': {
+      const start = n.attrs?.order ?? 1
+      return (Array.isArray(n.content) ? n.content : [])
+        .map((li: any, i: number) => `${start + i}. ${listItemToMarkdown(li)}`)
+        .join('\n')
+    }
+    case 'codeBlock': {
+      const lang = n.attrs?.language ?? ''
+      const text = (Array.isArray(n.content) ? n.content : [])
+        .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
+        .join('')
+      return '```' + lang + '\n' + text + '\n```'
+    }
+    case 'blockquote':
+      return (Array.isArray(n.content) ? n.content : [])
+        .map(blockToMarkdown)
+        .join('\n\n')
+        .split('\n')
+        .map((line: string) => `> ${line}`)
+        .join('\n')
+    case 'rule':
+      return '---'
+    // Media nodes reference attachments surfaced separately in the UI; skip them
+    // rather than emit noise.
+    case 'mediaSingle':
+    case 'mediaGroup':
+    case 'media':
+      return ''
+    default:
+      // Unknown block: fall back to its inline text if any, else recurse.
+      if (Array.isArray(n.content) && n.content.some((c: any) => c?.type === 'text')) {
+        return inlineToMarkdown(n.content)
+      }
+      return (Array.isArray(n.content) ? n.content : []).map(blockToMarkdown).filter(Boolean).join('\n\n')
+  }
+}
+
+// listItemToMarkdown collapses a listItem's paragraphs onto a single line (the
+// flat-list limitation noted in ../markdown).
+function listItemToMarkdown(li: any): string {
+  const blocks: any[] = Array.isArray(li?.content) ? li.content : []
+  return blocks.map(blockToMarkdown).filter(Boolean).join(' ')
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Assignee, Attachment, InlineSegment, SubtaskRef } from '../types'
+import type { Assignee, Attachment, SubtaskRef } from '../types'
 import { formatBytes } from '../util'
 import {
   keys,
@@ -28,10 +28,8 @@ import { Person } from './Avatar'
 import { AssigneeSelect } from './AssigneeSelect'
 import { InlineEditor } from './InlineEditor'
 import { InlineError } from './InlineError'
-import { RichText } from './Linkified'
+import { Markdown } from './Markdown'
 import { StatusSelect } from './StatusSelect'
-
-const segmentsToText = (segments: InlineSegment[]) => segments.map((s) => s.text).join('')
 
 function fmtDate(iso?: string) {
   if (!iso) return '—'
@@ -84,7 +82,7 @@ export function IssueDetailModal({
     updateSummary.mutate(summary, { onSuccess: () => setEditingTitle(false) })
   }
   function startEdit() {
-    setDescDraft(issue ? segmentsToText(issue.description) : '')
+    setDescDraft(issue?.description ?? '')
     setEditingDesc(true)
   }
   function saveDesc() {
@@ -187,7 +185,7 @@ export function IssueDetailModal({
                 ) : (
                   <div className="detail-desc">
                     {issue.description.length ? (
-                      <RichText segments={issue.description} />
+                      <Markdown source={issue.description} />
                     ) : (
                       <span className="muted">No description</span>
                     )}
@@ -219,7 +217,7 @@ export function IssueDetailModal({
                           <span className="muted">{fmtDate(c.updated ?? c.created)}</span>
                         </div>
                         <div className="comment-body">
-                          <RichText segments={c.body} />
+                          <Markdown source={c.body} />
                         </div>
                       </li>
                     ))}
