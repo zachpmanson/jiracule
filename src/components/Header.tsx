@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { useBoards, useMe } from '../queries'
 import { groupByProject } from '../util'
@@ -33,12 +33,9 @@ export function Header() {
 
   return (
     <header className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-solid border-line">
-      <div
-        className="font-bold text-base cursor-pointer text-accent"
-        onClick={() => navigate({ to: '/' })}
-      >
+      <Link to="/" className="font-bold text-base text-accent no-underline">
         jiracule
-      </div>
+      </Link>
       <select
         className="board-switcher"
         value={currentBoardId}
