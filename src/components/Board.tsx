@@ -53,6 +53,13 @@ export function Board({
     const active = e.active.data.current as DragData | undefined
     const target = e.over.data.current as DropData | undefined
     if (!active || !target) return
+    // Dropping back into the same lane is a no-op: no status movement, so send
+    // no transition request. This matters for pooled Agile columns, where the
+    // lane's drop target is its first status and a card there can live at a
+    // later status in the pool — without this check we'd fire a bogus
+    // transition to the first status and Jira rejects it ("no workflow
+    // transition from the current status into the target status").
+    if (active.sourceKey === target.targetKey) return
     if (active.issue.statusId === target.targetStatusId) return
     move.mutate({
       issueKey: active.issue.key,
