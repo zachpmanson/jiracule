@@ -7,11 +7,13 @@ export function CreateIssueDialog({
   boardId,
   defaultProjectKey,
   assignees,
+  me,
   onClose,
 }: {
   boardId: string
   defaultProjectKey: string
   assignees: Assignee[]
+  me?: Assignee
   onClose: () => void
 }) {
   const create = useCreateIssue(boardId)
@@ -70,11 +72,15 @@ export function CreateIssueDialog({
           Assignee
           <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
             <option value="">Unassigned</option>
-            {assignees.map((a) => (
-              <option key={a.accountId} value={a.accountId}>
-                {a.displayName}
-              </option>
-            ))}
+            {me && <option value={me.accountId}>Assign to me</option>}
+            {/* The current user is covered by “Assign to me” above — don't list them twice. */}
+            {assignees
+              .filter((a) => !me || a.accountId !== me.accountId)
+              .map((a) => (
+                <option key={a.accountId} value={a.accountId}>
+                  {a.displayName}
+                </option>
+              ))}
           </select>
         </label>
         <div className="create-parent">

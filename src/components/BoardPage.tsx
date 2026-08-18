@@ -152,6 +152,7 @@ export function BoardPage() {
           boardId={boardId}
           defaultProjectKey={board?.projectKey ?? ''}
           assignees={assignees}
+          me={me ?? undefined}
           onClose={() => setCreating(false)}
         />
       )}
