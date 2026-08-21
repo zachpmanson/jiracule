@@ -67,6 +67,35 @@ The service runs via systemd (`DynamicUser`, hardened). When the pnpm lockfile
 changes, `nix build` prints the new `pnpmDeps` hash to paste into
 `nix/package.nix`.
 
+## Staging (subpath mount)
+
+The app supports mounting under a URL subpath (e.g. `/staging/`) in addition to
+root — used for a staging instance on the same host as production (initially
+targeting `jiracule.zachmanson.com/staging/`).
+
+**App side** (merged in #10, `main`): `BASE_PATH` at build time flows into Vite's
+`base` → `src/base-path.ts` `BASE_URL` → the router's `basepath` and every
+absolute link (`/auth/login`, `/auth/callback`, `/auth/logout`, `/favicon.svg`,
+`/manifest.json`). Server redirects read a runtime `BASE_PATH` env var so OAuth
+callback/logout land back inside the subpath.
+
+To build for staging:
+
+```bash
+BASE_PATH=staging pnpm build   # -> .output shipped with /staging/ base
+BASE_PATH=staging node .output/server/index.mjs   # serves internally at root
+```
+
+Prod (no `BASE_PATH`) stays byte-identical at `/`.
+
+**Infra (nix, not in this repo):** to stand the instance up, [naboo nix config]
+needs a second `services.jiracule`-style unit on a new port that builds the
+package with `BASE_PATH=staging`, an env file (`/etc/jiracule-staging.env`)
+with `BASE_PATH=/staging` + a **separate `SESSION_SECRET`** from prod, and a
+Caddy `handle_path /staging/* → localhost:<port>` on the `jiracule.zachmanson.com`
+vhost (Caddy strips the prefix; the server serves at root internally). It is
+**not currently running** — the infra wiring is a TODO for a future deploy.
+
 ## Not in v1
 
 Sprints/backlog, attachments, arbitrary field editing, multi-site picker (uses
