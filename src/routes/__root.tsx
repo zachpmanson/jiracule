@@ -3,6 +3,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Header } from '../components/Header'
 import { AuthGate } from '../components/AuthGate'
+import { withBase } from '../base-path'
 import appCss from '../styles.css?url'
 
 export const Route = createRootRoute({
@@ -19,8 +20,8 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-      { rel: 'manifest', href: '/manifest.json' },
+      { rel: 'icon', type: 'image/svg+xml', href: withBase('/favicon.svg') },
+      { rel: 'manifest', href: withBase('/manifest.json') },
     ],
   }),
   shellComponent: RootDocument,

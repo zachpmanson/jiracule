@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { NOT_AUTHENTICATED } from '../auth-constants'
+import { withBase } from '../base-path'
 import { useMe } from '../queries'
 import { errMsg } from '../util'
 
@@ -20,7 +21,7 @@ function ConnectScreen() {
         {err && <p className="text-danger text-[13px]">{AUTH_ERRORS[err] ?? 'Sign-in failed.'}</p>}
         <a
           className="inline-block mt-4 px-[18px] py-2.5 rounded-card no-underline bg-accent text-accent-fg font-semibold hover:brightness-105"
-          href="/auth/login"
+          href={withBase('/auth/login')}
         >
           Connect Jira
         </a>
