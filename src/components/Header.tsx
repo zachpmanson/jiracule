@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { useBoards, useMe } from '../queries'
+import { withBase } from '../base-path'
 import { groupByProject } from '../util'
 import { Avatar } from './Avatar'
 
@@ -81,7 +82,7 @@ export function Header() {
             >
               <a
                 role="menuitem"
-                href="/auth/token"
+                href={withBase('/auth/token')}
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-1.5 text-[13px] text-fg no-underline hover:bg-canvas"
@@ -89,7 +90,7 @@ export function Header() {
               >
                 Debug: bearer token
               </a>
-              <form method="post" action="/auth/logout">
+              <form method="post" action={withBase('/auth/logout')}>
                 <button
                   type="submit"
                   role="menuitem"
