@@ -141,11 +141,11 @@ export function Column({
           <span className="count">{columnTotal ?? '…'}</span>
         </div>
         {statusChips.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {statusChips.map((name) => (
               <span
                 key={name}
-                className="bg-line text-muted rounded-[4px] px-1.5 py-px text-[10px] font-semibold tracking-[0.02em] normal-case"
+                className="whitespace-nowrap bg-line text-muted rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold leading-tight tracking-[0.02em] normal-case"
               >
                 {name}
               </span>
