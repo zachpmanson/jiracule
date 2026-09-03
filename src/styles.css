@@ -309,7 +309,7 @@ button.search-item:hover {
 .column {
   /* every column is the same fixed width; min-width:0 keeps a wide card from
      stretching one column past the others (it scrolls inside the lane instead) */
-  flex: 0 0 300px;
+  flex: 0 0 340px;
   min-width: 0;
   background: var(--col-bg);
   border-radius: var(--radius);
@@ -332,7 +332,7 @@ button.search-item:hover {
 }
 .column-header-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
 }
 .column-header .count {
@@ -425,7 +425,7 @@ button.search-item:hover {
 /* Rendered in the DragOverlay (portaled to <body>), so it needs an explicit
    width and floats above the columns without being clipped by their scroll. */
 .card-overlay {
-  width: 256px;
+  width: 324px;
   cursor: grabbing;
   box-shadow: 0 8px 20px rgba(9, 30, 66, 0.35);
   margin: 0;
