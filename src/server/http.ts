@@ -10,7 +10,16 @@ const SERVER_BASE_PATH = (process.env.BASE_PATH || '')
   .replace(/^\/+|\/+$/g, '')
   .replace(/\/$/, '')
 
+// Absolute ("https://auth.atlassian.com/…") and protocol-relative ("//host/…")
+// locations are already fully qualified — they must NOT get the app's base path
+// bolted on. Prefixing one yields a path on our own host ("/https://auth.…"),
+// which 404s: that is exactly how /auth/login's redirect to Atlassian's consent
+// screen was broken.
+const isAbsoluteUrl = (path: string) =>
+  /^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith('//')
+
 export const serverBase = (path: string) => {
+  if (isAbsoluteUrl(path)) return path
   const base = SERVER_BASE_PATH ? `/${SERVER_BASE_PATH}` : ''
   return base + (path.startsWith('/') ? path : `/${path}`)
 }
