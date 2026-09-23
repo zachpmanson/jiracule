@@ -11,21 +11,27 @@
     "generate-routes": "tsr generate",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:adf": "node scripts/verify-adf.mjs"
   },
   "dependencies": {
+    "@atlaskit/editor-json-transformer": "^9.8.2",
+    "@atlaskit/editor-markdown-transformer": "^6.3.1",
     "@dnd-kit/core": "^6.3.1",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
+    "markdown-it": "^14.3.2",
     "nitro": "latest",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@atlaskit/adf-utils": "^20.9.35",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/router-cli": "^1.132.0",
     "@tanstack/router-plugin": "latest",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

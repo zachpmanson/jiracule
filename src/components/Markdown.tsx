@@ -2,8 +2,11 @@ import { Fragment } from 'react'
 import { parseMarkdown, type MdBlock, type MdInline } from '../markdown'
 
 // Markdown renders a Markdown string (the wire format the server derives from a
-// Jira issue's ADF) into React elements. It shares its parser with the ADF
-// writer in ../markdown, so the rendered view matches what a save round-trips.
+// Jira issue's ADF) into React elements. It parses with the dependency-free
+// parser in ../markdown — the write path uses Atlassian's transformers instead
+// (see ../server/adf.ts) — and the server only derives this subset from ADF, so
+// the rendered view matches what a save round-trips for the constructs the
+// parser knows.
 export function Markdown({ source }: { source: string }) {
   return (
     <div className="md">

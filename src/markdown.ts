@@ -1,11 +1,14 @@
-// A tiny, dependency-free Markdown bridge shared by the client and server.
+// A tiny, dependency-free Markdown parser for the **render side**.
 //
 // Jira stores rich text as ADF (Atlassian Document Format). We use Markdown as
 // the neutral wire format between server and browser: the server converts ADF →
-// Markdown on read (`adfToMarkdown`, in jira.server.ts) and Markdown → ADF on
-// write (`markdownToAdf`, below). Both the client renderer (`Markdown.tsx`) and
-// the ADF writer share the one parser here, so what you see rendered and what
-// gets saved back always agree.
+// Markdown on read (`adfToMarkdown`, in server/jira.server.ts), and this parser
+// turns that Markdown back into React elements for display (`Markdown.tsx`).
+//
+// The write direction — Markdown → ADF — no longer lives here. It is Atlassian's
+// own `MarkdownTransformer` + `JSONTransformer`, in `server/adf.ts`, so the
+// browser bundle does not carry the ADF parser chain. The header of that file
+// records why the split was made and what keeps the two sides from disagreeing.
 //
 // Supported: paragraphs, ATX headings, bullet/ordered lists (flat), fenced code
 // blocks, blockquotes, thematic breaks, and inline **strong**, *emphasis*,
@@ -258,88 +261,4 @@ export function parseMarkdown(src: string): MdBlock[] {
   return blocks
 }
 
-// --- Markdown → ADF -------------------------------------------------------
 
-type AdfNode = { type: string; [k: string]: unknown }
-
-function textNode(text: string, marks: AdfNode[]): AdfNode {
-  return marks.length ? { type: 'text', text, marks } : { type: 'text', text }
-}
-
-function inlineToAdf(nodes: MdInline[], marks: AdfNode[] = []): AdfNode[] {
-  const out: AdfNode[] = []
-  for (const n of nodes) {
-    switch (n.type) {
-      case 'text':
-        if (n.text) out.push(textNode(n.text, marks))
-        break
-      case 'break':
-        out.push({ type: 'hardBreak' })
-        break
-      case 'code':
-        if (n.text) out.push(textNode(n.text, [...marks, { type: 'code' }]))
-        break
-      case 'strong':
-        out.push(...inlineToAdf(n.children, [...marks, { type: 'strong' }]))
-        break
-      case 'em':
-        out.push(...inlineToAdf(n.children, [...marks, { type: 'em' }]))
-        break
-      case 'strike':
-        out.push(...inlineToAdf(n.children, [...marks, { type: 'strike' }]))
-        break
-      case 'link':
-        out.push(...inlineToAdf(n.children, [...marks, { type: 'link', attrs: { href: n.href } }]))
-        break
-    }
-  }
-  return out
-}
-
-function paragraphNode(children: MdInline[]): AdfNode {
-  const content = inlineToAdf(children)
-  return content.length ? { type: 'paragraph', content } : { type: 'paragraph' }
-}
-
-function listItemNode(children: MdInline[]): AdfNode {
-  return { type: 'listItem', content: [paragraphNode(children)] }
-}
-
-function blockToAdf(block: MdBlock): AdfNode {
-  switch (block.type) {
-    case 'paragraph':
-      return paragraphNode(block.children)
-    case 'heading': {
-      const content = inlineToAdf(block.children)
-      return content.length
-        ? { type: 'heading', attrs: { level: block.level }, content }
-        : { type: 'paragraph' }
-    }
-    case 'bulletList':
-      return { type: 'bulletList', content: block.items.map(listItemNode) }
-    case 'orderedList':
-      return {
-        type: 'orderedList',
-        attrs: { order: block.start },
-        content: block.items.map(listItemNode),
-      }
-    case 'codeBlock':
-      return {
-        type: 'codeBlock',
-        ...(block.lang ? { attrs: { language: block.lang } } : {}),
-        ...(block.text ? { content: [{ type: 'text', text: block.text }] } : {}),
-      }
-    case 'blockquote':
-      return { type: 'blockquote', content: block.children.map(blockToAdf) }
-    case 'rule':
-      return { type: 'rule' }
-  }
-}
-
-// markdownToAdf wraps Markdown source in an ADF document for Jira's v3 API. An
-// empty input yields a single empty paragraph (a doc with no content, or an
-// empty text node, is rejected).
-export function markdownToAdf(src: string): AdfNode {
-  const content = parseMarkdown(src).map(blockToAdf)
-  return { type: 'doc', version: 1, content: content.length ? content : [{ type: 'paragraph' }] }
-}
