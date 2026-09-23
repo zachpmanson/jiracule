@@ -20,7 +20,7 @@ import type {
   User,
 } from '../types'
 import type { JiraAuth } from './session.server'
-import { markdownToAdf } from '../markdown'
+import { markdownToAdf } from './adf'
 
 export type { JiraAuth }
 
@@ -766,7 +766,7 @@ export function jqlQuote(s: string): string {
 
 // adfToMarkdown flattens an Atlassian Document Format node tree into a Markdown
 // string — the wire format the browser renders (Markdown.tsx) and edits, and
-// which markdownToAdf (../markdown) turns back into ADF on save. Inline marks
+// which markdownToAdf (./adf) turns back into ADF on save. Inline marks
 // (bold/italic/code/strike/link) and block structure (headings, lists, code
 // blocks, quotes) are preserved so a read → edit → write round-trip keeps its
 // formatting instead of collapsing to plain text.
